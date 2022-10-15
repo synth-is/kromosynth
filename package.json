@@ -1,0 +1,28 @@
+{
+  "name": "kromosynth",
+  "version": "1.0.0",
+  "description": "Audio waveform breeding with neuro-evolution of pattern producing networks and quality diversity search.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "audio",
+    "synthesis",
+    "neuro-evolution",
+    "quality-diversity",
+    "map-elites",
+    "cppn",
+    "neat"
+  ],
+  "author": "Björn Þór Jónsson <bangsi@bthj.is> (synth.is)",
+  "license": "AGPL-3.0",
+  "dependencies": {
+    "chroma-js": "^2.4.2",
+    "clone": "^2.1.2",
+    "gpu.js": "^2.15.2",
+    "lodash": "^4.17.21",
+    "neatjs": "^0.3.1",
+    "virtual-audio-graph": "^0.19.0"
+  }
+}

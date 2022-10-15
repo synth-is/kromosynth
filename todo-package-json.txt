@@ -1,0 +1,16 @@
+{
+  "name": "wavekilde",
+  "version": "1.0.0",
+  "description": "Audio waveform breeding with neuro-evolution",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "audio",
+    "synthesis",
+    "neuroevolution"
+  ],
+  "author": "Björn Þór Jónsson (bangsi@bthj.is)",
+  "license": "AGPL-3.0-or-later"
+}
