@@ -16,8 +16,9 @@
     "neat"
   ],
   "author": "Björn Þór Jónsson <bangsi@bthj.is> (synth.is)",
-  "license": "AGPL-3.0",
+  "license": "AGPL-3.0-or-later",
   "dependencies": {
+    "@tensorflow/tfjs": "^4.0.0",
     "chroma-js": "^2.4.2",
     "clone": "^2.1.2",
     "gpu.js": "^2.15.2",

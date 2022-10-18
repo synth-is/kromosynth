@@ -9,3 +9,7 @@ export {
   startMemberOutputsRendering,
   startAudioBuffersRendering
 } from "./util/render";
+export {
+  getNewAudioSynthesisGenome,
+  getNewAudioSynthesisGenomeByMutation
+} from "./util/audio-synthesis-genome";
