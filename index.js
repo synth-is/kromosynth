@@ -1,15 +1,16 @@
 export {
   getOutputsForMemberInCurrentPopulation,
   getAudioBuffersForMember
-} from "./wavekilde";
+} from "./wavekilde.js";
 export {
   renderAudio,
   renderAudioFromPatchAndMember,
   renderAudioAndSpectrogram,
+  wireUpAudioGraphForPatchAndWaveNetwork,
   startMemberOutputsRendering,
   startAudioBuffersRendering
-} from "./util/render";
+} from "./util/render.js";
 export {
   getNewAudioSynthesisGenome,
   getNewAudioSynthesisGenomeByMutation
-} from "./util/audio-synthesis-genome";
+} from "./util/audio-synthesis-genome.js";

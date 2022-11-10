@@ -1,7 +1,7 @@
 
-import Utils from '../utils';
-import Node from './node';
-import asNEAT from '../asNEAT';
+import Utils from '../utils.js';
+import Node from './node.js';
+import asNEAT from '../asNEAT.js';
 let {context} = asNEAT;
 let name = "ConvolverNode";
 

@@ -1,6 +1,6 @@
-import Network from '../as-neat/network';
-import Evolver from '../cppn-neat/network-evolution';
-import { doesPatchNetworkHaveMinimumFitness } from './patch';
+import Network from '../as-neat/network.js';
+import Evolver from '../cppn-neat/network-evolution.js';
+import { doesPatchNetworkHaveMinimumFitness } from './patch.js';
 import neatjs from 'neatjs';
 
 let evolver;
@@ -24,7 +24,7 @@ export function getNewAudioSynthesisGenome(evolutionRunId, generationNumber, par
 
 export async function getNewAudioSynthesisGenomeByMutation(
     genome,
-    evolutionRunId, generationNumber, parentIndex, algorithm,
+    evolutionRunId, generationNumber, parentIndex, algorithm, audioCtx,
     probabilityMutatingWaveNetwork = 0.5,
     probabilityMutatingPatch = 0.5,
     asNEATMutationParams = {}
@@ -73,7 +73,7 @@ function initializeWaveNetwork() {
   //   cppnNeatParent = cppnNeatWaveNetwork
   // }
 
-  console.log(cppnNeatWaveNetwork);
+  // console.log(cppnNeatWaveNetwork);
   return cppnNeatWaveNetwork;
 }
 
@@ -88,7 +88,7 @@ function getInitialPatchASNEAT() {
   //   );
   // }
 
-  console.log(audioNetwork);
+  // console.log(audioNetwork);
   return audioNetwork;
 }
 

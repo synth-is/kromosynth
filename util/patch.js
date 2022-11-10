@@ -1,8 +1,8 @@
 import {
   getOutputsForMemberInCurrentPopulation,
   getAudioBuffersForMember
-} from '../wavekilde';
-import { patchFromAsNEATnetwork } from './audio-graph-asNEAT-bridge';
+} from '../wavekilde.js';
+import { patchFromAsNEATnetwork } from './audio-graph-asNEAT-bridge.js';
 
 export async function doesPatchNetworkHaveMinimumFitness(
   asNEATNetwork, waveNetworkPopulationMember, audioCtx, checkDataAmplitude

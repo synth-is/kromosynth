@@ -1,7 +1,7 @@
-import Utils from '../utils';
-import Node from './node';
-import NetworkOutputNode from './networkOutputNode';
-import _ from "lodash";
+import Utils from '../utils.js';
+import Node from './node.js';
+import NetworkOutputNode from './networkOutputNode.js';
+import _ from "lodash-es";
 
 let name = "NoteNetworkOutputNode";
 /**

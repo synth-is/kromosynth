@@ -2,11 +2,11 @@
 // and vice versa,
 // synth.is patches from asNEAT networks
 
-import asNeatUtils from '../as-neat/utils';
-import { audioGraphNodes as audioGraphNodesSchema } from './audio-graph';
-import isString from "lodash/isString";
-import isNumber from "lodash/isNumber";
-import merge from "lodash/merge";
+import asNeatUtils from '../as-neat/utils.js';
+import { audioGraphNodes as audioGraphNodesSchema } from './audio-graph.js';
+import isString from "lodash-es/isString.js";
+import isNumber from "lodash-es/isNumber.js";
+import merge from "lodash-es/merge.js";
 
 export const asNEATnetworkFromPatch = async patch => {
 
@@ -136,7 +136,7 @@ export const patchFromAsNEATnetwork = asNEATnetwork => {
   asNEATnetwork = JSON.parse(asNEATnetwork);
   const { nodes, connections } = asNEATnetwork;
   const synthIsPatch = { audioGraph: {}, networkOutputs: [] };
-  console.log("---patchFromAsNEATnetwork asNEATnetwork.nodes:",asNEATnetwork.nodes);
+  // console.log("---patchFromAsNEATnetwork asNEATnetwork.nodes:",asNEATnetwork.nodes);
   asNEATnetwork.nodes
   .map( n => JSON.parse(n) )  // TODO: why is this nested parsing required?
   .filter( n => n.name !== "OutNode")
@@ -192,7 +192,7 @@ export const patchFromAsNEATnetwork = asNEATnetwork => {
       ];
     }
   });
-console.log("---patchFromAsNEATnetwork asNEATnetwork.connections:",asNEATnetwork.connections);
+  // console.log("---patchFromAsNEATnetwork asNEATnetwork.connections:",asNEATnetwork.connections);
   const audioGraphTargetsToSources = {};
   const audioGraphTargetsToNetworkOutputs = {};
   asNEATnetwork.connections

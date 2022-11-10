@@ -1,6 +1,6 @@
 
-import asNEAT from '../asNEAT';
-import Node from './node';
+import asNEAT from '../asNEAT.js';
+import Node from './node.js';
 
 let name = "OutNode";
 

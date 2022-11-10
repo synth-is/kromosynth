@@ -1,7 +1,7 @@
 
-import Utils from './utils';
-import asNEAT from './asNEAT';
-import _ from "lodash";
+import Utils from './utils.js';
+import asNEAT from './asNEAT.js';
+import _ from "lodash-es";
 
 let log = Utils.log,
     context = asNEAT.context,

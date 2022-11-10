@@ -1,7 +1,7 @@
 
-import Utils from '../utils';
-import Node from './node';
-import context from '../asNEAT';
+import Utils from '../utils.js';
+import Node from './node.js';
+import context from '../asNEAT.js';
 
 let name = "WaveShaperNode";
 

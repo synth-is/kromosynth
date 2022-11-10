@@ -1,7 +1,7 @@
 import {GPU} from 'gpu.js';
-import { addInputFunctionsToGPU } from '../util/gpu-functions';
+import { addInputFunctionsToGPU } from '../util/gpu-functions.js';
 
-onmessage = (e) => {
+const onmessage = (e) => {
   const activationStringForOneOutput = e.data.activationStringForOneOutput;
   const sampleCount = e.data.sampleCount;
   const inputPeriods = e.data.inputPeriods;
@@ -30,3 +30,5 @@ onmessage = (e) => {
     {outputResult}, [outputResult.buffer]
   );
 }
+
+export default onmessage;

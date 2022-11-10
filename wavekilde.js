@@ -1,14 +1,14 @@
-import Activator from './cppn-neat/network-activation';
-import Renderer from './cppn-neat/network-rendering';
-import { concatenateTypedArrays } from './util/arrays';
-import { numWorkers } from './util/range';
-import asNeatUtils from './as-neat/utils';
+import Activator from './cppn-neat/network-activation.js';
+import Renderer from './cppn-neat/network-rendering.js';
+import { concatenateTypedArrays } from './util/arrays.js';
+import { numWorkers } from './util/range.js';
+import asNeatUtils from './as-neat/utils.js';
 import clone from 'clone';
 
 // const ActivationSubWorker = require("worker!../workers/network-activation-sub-worker.js");
 // inlining the worker seems necessary when visiting react-router path with /:parameters !?!!
 // const ActivationSubWorker = require("worker?inline!../workers/network-activation-sub-worker.js");
-import ActivationSubWorker from "./workers/network-activation-sub-worker?worker";
+import ActivationSubWorker from "./workers/network-activation-sub-worker.js?worker";
 
 let activator;
 let renderer;
@@ -332,11 +332,12 @@ function getAudioBuffersForMember(
   memberOutputs,
   populationIndex, memberIndexOrKey,  // TODO: refactor those away
   duration,
-  noteDelta, reverse, sampleRateIn,
+  noteDelta, reverse, sampleRateIn,  // TODO: reverse is not used (clients can reverse the rendered audio buffer; see e.g. live-coding-container in the synth.is web app)
   patchParam,
   renderSpectrograms, // TODO: unused?
   spectrogramDimensions,
-  getDataArray
+  getDataArray,
+  offlineAudioContext
 ) {
   return new Promise( (resolve, reject) => {
 
@@ -364,7 +365,8 @@ function getAudioBuffersForMember(
     return renderer
       .renderNetworksOutputSamplesAsAudioBuffer(
         memberOutputs, patch, noteDelta, spectrogramDimensions,
-        getDataArray
+        getDataArray,
+        offlineAudioContext
       )
       .then(
         audioBufferAndCanvas => resolve(audioBufferAndCanvas),
@@ -374,7 +376,23 @@ function getAudioBuffersForMember(
   });
 }
 
+function wireUpAudioGraph(
+  memberOutputs, synthIsPatch, duration, noteDelta, audioContextInstance
+) {
+  const sampleCount = Math.round(audioContextInstance.sampleRate * duration);
+  // keep a singleton instance
+  if( ! renderer || renderer.sampleRate !== audioContextInstance.sampleRate ) {
+    renderer = new Renderer( audioContextInstance.sampleRate );
+  }
+  return renderer.wireUpAudioGraphAndConnectToAudioContextDestination(
+    memberOutputs, synthIsPatch, noteDelta,
+    audioContextInstance,
+    sampleCount
+  );
+}
+
 export {
   getOutputsForMemberInCurrentPopulation,
-  getAudioBuffersForMember
+  getAudioBuffersForMember,
+  wireUpAudioGraph
 };

@@ -1,6 +1,6 @@
-import Activator from '../cppn-neat/network-activation';
+import Activator from '../cppn-neat/network-activation.js';
 
-onmessage = function(e) {
+const onmessage = function(e) {
   console.log('data from message to subworker: ', e.data );
 
   const activator = new Activator( e.data.sampleRate );
@@ -26,3 +26,5 @@ onmessage = function(e) {
     );
   });
 }
+
+export default onmessage;

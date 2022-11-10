@@ -2,7 +2,7 @@ import neatjs from 'neatjs';
 import cppnjs from 'cppnjs';
 import {
   setActivationFunctions, setActivationFunctionsDefaultProbabilities
-} from './activation-functions';
+} from './activation-functions.js';
 
 import {
   CONNECTION_PROPORTION,
@@ -10,7 +10,7 @@ import {
   INPUTS,  // number of inputs to the neural network
   OUTPUTS, // TODO: let the number of outputs from the NN be configurable in UI ?
   SEED_COUNT, // number of individuals in seed behind initial population
-} from './evolution-constants';
+} from './evolution-constants.js';
 
 let instance = null;
 /**

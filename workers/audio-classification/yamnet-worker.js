@@ -1,5 +1,5 @@
 import * as tf from '@tensorflow/tfjs';
-import { yamnetTags } from './classificationTags';
+import { yamnetTags } from './classificationTags.js';
 
 let _graphModel;
 let model;

@@ -1,16 +1,33 @@
 
 var ns = {};
 
-window.AudioContext = window.AudioContext ||
-  window.webkitAudioContext ||
-  function() {this.supported = false;};
-ns.context = new window.AudioContext();
-if (typeof ns.context.supported === 'undefined')
-  ns.context.supported = true;
+// TODO: review if Web Audio API (context) is really needed
+let audioContext;
+if( typeof window === 'undefined' ) { // Node.js
+  // const NodeWebAudioAPI = await import('node-web-audio-api');
+  // console.log("NodeWebAudioAPI",NodeWebAudioAPI);
+  // const { AudioContext } = NodeWebAudioAPI.default;
+  // console.log("AudioContext",AudioContext);
+  // ns.context = new AudioContext();
+  ns.context = function() {this.supported = false;};
+} else {
+  ns.context = new (window.AudioContext || window.webkitAudioContext || function() {this.supported = false;})();
+}
+// TODO: ?
+// if (typeof ns.context.supported === 'undefined')
+//   ns.context.supported = true;
 
-window.OfflineAudioContext = window.OfflineAudioContext ||
-  window.webkitOfflineAudioContext ||
-  function() {this.supported = false;};
+let offlineAudioContext
+if( typeof window === 'undefined' ) { // Node.js
+  // const NodeWebAudioAPI = await import('node-web-audio-api');
+  // const { OfflineAudioContext } = NodeWebAudioAPI;
+  // offlineAudioContext = OfflineAudioContext;
+  offlineAudioContext = function() {this.supported = false;};
+} else {
+  offlineAudioContext = window.OfflineAudioContext ||
+    window.webkitOfflineAudioContext ||
+    function() {this.supported = false;};
+}
 
 // only create the gain if context is found
 // (helps on tests)
@@ -35,7 +52,7 @@ ns.OutNodes = [];
   render a single time for each one (aka, can't reuse)
 */
 ns.createOfflineContextAndGain = function() {
-  var offlineContext = new window.OfflineAudioContext(2, 10 * 44100, 44100),
+  var offlineContext = new offlineAudioContext(2, 10 * 44100, 44100),
       offlineGlobalGain;
   if (typeof offlineContext.supported === 'undefined')
     offlineContext.supported = true;

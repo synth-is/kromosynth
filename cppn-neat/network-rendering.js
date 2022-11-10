@@ -1,16 +1,13 @@
-import { isAudible, remapNumberToRange, numWorkers } from '../util/range';
-import { concatenateTypedArrays } from '../util/arrays';
-import { getMemberOutputsKey } from '../util/network-output';
-import { getFrequencyToNoteDelta } from '../wavekilde';
+import { isAudible, remapNumberToRange, numWorkers } from '../util/range.js';
+import { concatenateTypedArrays } from '../util/arrays.js';
+import { getMemberOutputsKey } from '../util/network-output.js';
+import { getFrequencyToNoteDelta } from '../wavekilde.js';
 // import { lerp } from '../util/range';
 import createVirtualAudioGraph from 'virtual-audio-graph';
 import clone from 'clone';  // TODO: replace with import cloneDeep from "lodash/cloneDeep"; ?
 import chroma from 'chroma-js';
-import isString from "lodash/isString";
-import isNumber from "lodash/isNumber";
-
-import GainValuesPerAudioWavesWorker from "../workers/gain-values-per-audio-wave-worker?worker";
-import RemapControlArrayToValueCurveRangeWorker from "../workers/remap-control-array-to-value-curve-range-worker?worker";
+import isString from "lodash-es/isString.js";
+import { spawn, Thread, Worker, Transfer } from "threads"
 
 
 /**
@@ -23,56 +20,45 @@ class Renderer {
     this.sampleRate = sampleRate;
   }
 
-  renderNetworksOutputSamplesAsAudioBuffer(
-      memberOutputs, patch, noteDelta, spectrogramDimensions,
-      getDataArray
+  wireUpAudioGraphAndConnectToAudioContextDestination(
+      memberOutputs, patch, noteDelta,
+      audioContextInstance,
+      sampleCount
   ) {
-    const sampleCount = Math.round(this.sampleRate * patch.duration);
 
     return new Promise( (resolve, reject) => {
 
-      // TODO: move in hardcoded rendering from IndividualContainer
-
       console.log('Wiring up audio graph...');
-
-      const startAudioCtxInstance = performance.now();
-
-      const offlineCtx = new (OfflineAudioContext || webkitOfflineAudioContext)( 1 /*channels*/,
-        this.sampleRate * patch.duration, this.sampleRate);
-
-      const endAudioCtxInstance = performance.now();
-      console.log(`%c instantiating audio context took ${endAudioCtxInstance-startAudioCtxInstance} milliseconds`,'color:darkorange');
-
 
       // getSubtractiveSynthesisExampleGraph();
 
       // getWawetableSynthesisExampleGraph();
 
-
       const virtualAudioGraph = createVirtualAudioGraph({
-        audioContext: offlineCtx,
-        output: offlineCtx.destination,
+        audioContext: audioContextInstance,
+        output: audioContextInstance.destination,
       });
 
       // this.updateWithTestFMAudioGraph(
       //   virtualAudioGraph, memberOutputs, offlineCtx, sampleCount, patch.duration );
 
+
       // let's clone the patch,
       // to not clutter the saved patch definition with value curve sample data
       const _patch = clone(patch);
 
-// /*
       this.getNodeGraphFromPatch(
         _patch,
         memberOutputs,
         sampleCount, patch.duration,
         virtualAudioGraph,
-        offlineCtx,
+        audioContextInstance,
         noteDelta
       ).then( graphDefinition => {
 
         try {
           virtualAudioGraph.update( graphDefinition );
+          resolve( virtualAudioGraph )
         }
         catch (e) {
           console.log("Error creating virtual audio graph");
@@ -80,6 +66,40 @@ class Renderer {
         }
 
         console.log('Done wiring up audio graph, will now render.');
+      });
+
+    });
+  }
+
+  renderNetworksOutputSamplesAsAudioBuffer(
+      memberOutputs, patch, noteDelta, spectrogramDimensions,
+      getDataArray,
+      audioContext,
+  ) {
+
+    return new Promise( (resolve, reject) => {
+
+      // TODO: move in hardcoded rendering from IndividualContainer
+
+      const startAudioCtxInstance = performance.now();
+      let audioContextInstance;
+      if ( audioContext ) {
+        audioContextInstance = audioContext;
+      } else {
+        audioContextInstance = new (OfflineAudioContext || webkitOfflineAudioContext)( 1 /*channels*/,
+        this.sampleRate * patch.duration, this.sampleRate);
+      }
+      
+      const endAudioCtxInstance = performance.now();
+      console.log(`%c instantiating audio context took ${endAudioCtxInstance-startAudioCtxInstance} milliseconds`,'color:darkorange');
+
+      const sampleCount = Math.round(this.sampleRate * patch.duration);
+
+      this.wireUpAudioGraphAndConnectToAudioContextDestination(
+          memberOutputs, patch, noteDelta,
+          audioContextInstance,
+          sampleCount
+      ).then( virtualAudioGraph => {
 
         /////////// spectrogram
         // migrate to AudioWorklet node?
@@ -88,14 +108,14 @@ class Renderer {
         // https://developer.mozilla.org/en-US/docs/Web/API/ScriptProcessorNode
         // https://developer.mozilla.org/en-US/docs/Web/API/AudioWorkletNode
         let freqDataArrays;
-        if( spectrogramDimensions ) {
+        if( spectrogramDimensions && virtualAudioGraph.audioContext.createScriptProcessor && typeof virtualAudioGraph.audioContext.createScriptProcessor === 'function' ) {
 
           // https://gist.github.com/moust/95f5cd5daa095f1aad89
           // https://stackoverflow.com/a/46069463/169858
-          const scp = offlineCtx.createScriptProcessor(2048, 1, 1);
-          scp.connect(offlineCtx.destination);
+          const scp = virtualAudioGraph.audioContext.createScriptProcessor(2048, 1, 1);
+          scp.connect(virtualAudioGraph.audioContext.destination);
 
-          const analyser = offlineCtx.createAnalyser();
+          const analyser = virtualAudioGraph.audioContext.createAnalyser();
           analyser.smoothingTimeConstant = 0;
           analyser.fftSize = 1024;
           analyser.connect(scp);
@@ -127,16 +147,10 @@ class Renderer {
         /////////// spectrogram - end
 
         const startRenderAudioGraph = performance.now();
-// */
 
-/*
-      this.getWawetableSynthesisExampleGraph(
-        memberOutputs, offlineCtx, sampleCount, patch
-      ).then( () => {
-        const startRenderAudioGraph = performance.now();
-*/
         // Offline rendering of the audio graph to a reusable buffer
-        offlineCtx.startRendering().then(function( renderedBuffer ) {
+        // TODO: assuming virtualAudioGraph.audioContext is offline - verify?
+        virtualAudioGraph.audioContext.startRendering().then(function( renderedBuffer ) {
           console.log('Rendering completed successfully');
           const endRenderAudioGraph = performance.now();
           console.log(`%c Rendering audio graph took ${endRenderAudioGraph - startRenderAudioGraph} milliseconds`, 'color:darkorange');
@@ -164,7 +178,7 @@ class Renderer {
           if( getDataArray ) {
             networkIndividualSound = bufferChannelData;
           } else {
-            const renderedBufferAfterRemapToRange = this.getAudioBuffer( [bufferChannelData], offlineCtx, sampleCount );
+            const renderedBufferAfterRemapToRange = this.getAudioBuffer( [bufferChannelData], virtualAudioGraph.audioContext, sampleCount );
             networkIndividualSound = this.ensureBufferStartsAndEndsAtZero(renderedBufferAfterRemapToRange);
           }
 
@@ -458,6 +472,7 @@ class Renderer {
             if( 'buffer' === oneAudioGraphNodeConn.paramName ) {
               const audioBuffer = this.getAudioBuffer(
                 [valueCurve], audioContext, sampleCount );
+const channlelData = audioBuffer.getChannelData(0);
               paramNameToValueCurve.set(
                 `${outputIndex}_${connectionIndex}_${oneAudioGraphNodeConn.paramName}`, audioBuffer );
             } else {
@@ -782,6 +797,8 @@ class Renderer {
 
     const wavetable = new Function( 'params', functionBody );
 
+    const wavetableStringified = wavetable.toString();
+
     return wavetable;
   }
 
@@ -905,6 +922,7 @@ class Renderer {
       for( let i=0; i < sampleCount; i++ ) {
         nowBuffering[i] = networkOutputBuffer[i];
       }
+      arrayBuffer.copyToChannel(nowBuffering, channel);
     }
     return arrayBuffer;
   }
@@ -923,7 +941,7 @@ class Renderer {
 
 
 
-  spawnMultipleGainValuesPerAudioWaveWorkers( audioWaveCount, controlWave ) {
+  async spawnMultipleGainValuesPerAudioWaveWorkers( audioWaveCount, controlWave ) {
     // const chunk = Math.round(
     //   controlWave.length / 1 // chrome tends to crash, so we'll skip this for now: numWorkers
     // );
@@ -947,17 +965,16 @@ class Renderer {
   }
 
   spawnOneGainValuesPerAudioWaveWorker( audioWaveCount, _controlWave ) {
-    const promise = new Promise( (resolve, reject) => {
-      const gainValuesPerAudioWaveWorker = new GainValuesPerAudioWavesWorker();
+    const promise = new Promise( async (resolve, reject) => {
+
       let controlWave = new Float32Array(_controlWave);
-      gainValuesPerAudioWaveWorker.postMessage({
-        audioWaveCount,
-        controlWave
-      }, [controlWave.buffer] );
-      gainValuesPerAudioWaveWorker.onmessage = (e) => {
-        gainValuesPerAudioWaveWorker.terminate();
-        resolve( e.data.gainValues );
-      };
+
+      const gainValuesPerAudioWave = await spawn(new Worker("../workers/gain-values-per-audio-wave-worker.js"));
+      const gainValues = await gainValuesPerAudioWave(audioWaveCount, Transfer(controlWave.buffer));
+
+      await Thread.terminate(gainValuesPerAudioWave);
+
+      resolve( gainValues );
     });
     return promise;
   }
@@ -1012,21 +1029,20 @@ class Renderer {
     });
   }
 
-  getGainControlArrayRemappedToValueCurveRange( gainControlArray ) {
+  async getGainControlArrayRemappedToValueCurveRange( _gainControlArray ) {
 
-    return new Promise(function(resolve, reject) {
-      const remapControlArrayToValueCurveRangeWorker =
-        new RemapControlArrayToValueCurveRangeWorker();
+    const promise = new Promise( async function(resolve, reject) {
 
-      remapControlArrayToValueCurveRangeWorker.postMessage({
-        gainControlArray
-      }, [gainControlArray.buffer] );
+      let gainControlArray = new Float32Array(_gainControlArray);
 
-      remapControlArrayToValueCurveRangeWorker.onmessage = (e) => {
-        remapControlArrayToValueCurveRangeWorker.terminate();
-        resolve( e.data.valueCurve );
-      };
+      const remapControlArrayToValueCurveRange = await spawn(new Worker("../workers/remap-control-array-to-value-curve-range-worker.js"));
+      const remappedGainControlArray = await remapControlArrayToValueCurveRange( Transfer(gainControlArray.buffer) );
+
+      await Thread.terminate(remapControlArrayToValueCurveRange);
+
+      resolve( remappedGainControlArray );
     });
+    return promise;
   }
 
 }

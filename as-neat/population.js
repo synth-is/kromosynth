@@ -1,6 +1,6 @@
 
-import { doesPatchNetworkHaveMinimumFitness } from '../util/patch';
-import { patchFromAsNEATnetwork } from '../util/audio-graph-asNEAT-bridge';
+import { doesPatchNetworkHaveMinimumFitness } from '../util/patch.js';
+import { patchFromAsNEATnetwork } from '../util/audio-graph-asNEAT-bridge.js';
 
 import Utils from'./utils';
 

@@ -1,13 +1,13 @@
 import neatjs from 'neatjs';
 import cppnjs from 'cppnjs';
-import { setActivationFunctions } from './activation-functions';
-import { getMemberOutputsKey } from '../util/network-output';
-import { addInputFunctionsToGPU } from '../util/gpu-functions';
-import { lerp } from '../util/range';
-import { randomFromInterval, halfChance } from '../util/random';
+import { setActivationFunctions } from './activation-functions.js';
+import { getMemberOutputsKey } from '../util/network-output.js';
+import { addInputFunctionsToGPU } from '../util/gpu-functions.js';
+import { lerp } from '../util/range.js';
+import { randomFromInterval, halfChance } from '../util/random.js';
 import {GPU} from 'gpu.js';
 
-import NetworkActivationGPUWorker from "../workers/network-activation-gpu-worker?worker";
+import NetworkActivationGPUWorker from "../workers/network-activation-gpu-worker.js?worker";
 
 /**
  * Activates outputs of the provided network
@@ -22,9 +22,6 @@ class Activator {
     this.sampleRate = sampleRate;
 
     setActivationFunctions( cppnjs );
-
-    console.log("---cppnjs", cppnjs);
-    console.log("---neatjs", neatjs);
   }
 
   getInputSignals(

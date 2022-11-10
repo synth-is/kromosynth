@@ -224,4 +224,4 @@ export function getNoteMarksForOctave( octave ) {
 }
 
 // TODO: questionably the right location:
-export const numWorkers = navigator.hardwareConcurrency || 4;
+export const numWorkers = typeof navigator !== 'undefined' ? navigator.hardwareConcurrency || 4 : 4;

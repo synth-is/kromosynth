@@ -1,4 +1,4 @@
-import Activator from '../cppn-neat/network-activation';
+import Activator from '../cppn-neat/network-activation.js';
 
 const ActivationSubWorker = require("worker!./network-activation-sub-worker.js");
 

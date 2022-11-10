@@ -23,8 +23,6 @@ export const waveActivationFunction = {
  */
 export function setActivationFunctions( cppnjs ) {
 
-  console.log("----setActivationFunctions:",setActivationFunctions);
-
   // https://www.intmath.com/functions-and-graphs/graphs-using-svg.php?function1=1.0+-+2.0+*+(x-Math.floor(x))&function2=-1.0+%2B+2.0+*+(x-Math.floor(x))&xMin=-5&xMax=5&xGrid=2&yMin=-1&yMax=1&yGrid=1&gwidth=290&gheight=130
   if( ! cppnjs.cppnActivationFunctions[waveActivationFunction.spike] ) {
     cppnjs.cppnActivationFunctions.AddActivationFunction(

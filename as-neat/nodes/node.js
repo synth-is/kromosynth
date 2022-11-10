@@ -1,5 +1,5 @@
-import _ from 'lodash';
-import Utils from '../utils';
+import _ from 'lodash-es';
+import Utils from '../utils.js';
 
 let name = "Node";
 

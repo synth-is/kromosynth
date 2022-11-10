@@ -1,16 +1,16 @@
 
-import Utils from './utils';
-import NoteOscillatorNode from './nodes/noteOscillatorNode';
-import OscillatorNode from './nodes/oscillatorNode';
-import NetworkOutputNode from './nodes/networkOutputNode';
-import NoteNetworkOutputNode from './nodes/noteNetworkOutputNode';
-import AudioBufferSourceNode from './nodes/audioBufferSourceNode';
-import WavetableNode from './nodes/wavetableNode';
-import OutNode from './nodes/outNode';
-import GainNode from './nodes/gainNode';
-import Connection from './connection';
-import asNEAT from './asNEAT';
-import _ from "lodash";
+import Utils from './utils.js';
+import NoteOscillatorNode from './nodes/noteOscillatorNode.js';
+import OscillatorNode from './nodes/oscillatorNode.js';
+import NetworkOutputNode from './nodes/networkOutputNode.js';
+import NoteNetworkOutputNode from './nodes/noteNetworkOutputNode.js';
+import AudioBufferSourceNode from './nodes/audioBufferSourceNode.js';
+import WavetableNode from './nodes/wavetableNode.js';
+import OutNode from './nodes/outNode.js';
+import GainNode from './nodes/gainNode.js';
+import Connection from './connection.js';
+import asNEAT from './asNEAT.js';
+import _ from "lodash-es";
 
 var nodeTypes = asNEAT.nodeTypes,
     log = Utils.log,
@@ -482,6 +482,7 @@ Network.prototype.splitMutation = async function() {
  */
 Network.prototype.addOscillator = function( force, forceNodeConnection ) {
   var oscillator, possibleTargets, target, connection;
+  var self = this; // TODO: this became necessary after running with Node.js (in browsers was fine  ¯\_(ツ)_/¯ )
 
   // Add FM Oscillator or audio oscillator
   if (
@@ -532,7 +533,6 @@ Network.prototype.addOscillator = function( force, forceNodeConnection ) {
       oscillator = NoteOscillatorNode.random();
       isPeriodicOscillator = true;
     }
-console.log("isPeriodicOscillator",isPeriodicOscillator);
     // Pick a random non oscillator node
     possibleTargets = _.filter(this.nodes, function(node) {
       let connExists = _.find(self.connections, function(conn) { // TODO: reusable function with getPossibleNewConnections or just WET?
@@ -612,6 +612,9 @@ console.log("isPeriodicOscillator",isPeriodicOscillator);
 Network.prototype.addAudioBufferSource = function() {
   // TODO: audioBufferSourceNode or Wavetable, half chance
   let audioBufferSource, connection, possibleTargets, target;
+
+  var self = this; // TODO: this became necessary after running with Node.js (in browsers was fine  ¯\_(ツ)_/¯ )
+
   if( Utils.randomChance(0.5) ) {
     audioBufferSource = AudioBufferSourceNode.random();
   } else {
@@ -696,7 +699,7 @@ Network.prototype.addWavetableMixWaveConnection = function(targetNode) {
     Utils.randomIndexIn(0,NetworkOutputNode.TYPES.length-3) // -3 as the noise types occupy the last three slots
   ];
   const targetParameter = targetNode.connectableParameters[0]; // assume we know mixWave is the first element
-console.log("connections.push from addConnection method, waveTableMixWave");
+// console.log("connections.push from addConnection method, waveTableMixWave");
   this.connections.push(new Connection({
     sourceNode: wavetableMixWaveSourceNode,
     targetNode: targetNode,
@@ -876,14 +879,14 @@ Network.prototype.getPossibleNewConnections = function(usingFM) {
         // though not using FM, if target is bufferSource, connect to targetParameter 'buffer'
         if( "AudioBufferSourceNode"===targetNode.name ) {
           connectionParams['targetParameter'] = "buffer";
-          console.log("---connection to AudioBufferSourceNode buffer");
+          // console.log("---connection to AudioBufferSourceNode buffer");
         } else if( "WavetableNode"===targetNode.name ) {
           if( Utils.randomChance(0.5) ) {
             connectionParams['targetParameter'] = "buffer";
-            console.log("---connection to WavetableNode buffer");
+            // console.log("---connection to WavetableNode buffer");
           } else {
             connectionParams['targetParameter'] = "mix";
-            console.log("---connection to WavetableNode mix");
+            // console.log("---connection to WavetableNode mix");
           }
         }
         connections.push(new Connection( connectionParams ));
@@ -1025,8 +1028,8 @@ Network.prototype.toJSON = function() {
     nodes: [],
     connections: []
   };
-  console.log("--- this.nodes:",this.nodes);
-  console.log("--- this.connections:",this.connections);
+  // console.log("--- this.nodes:",this.nodes);
+  // console.log("--- this.connections:",this.connections);
   _.forEach(this.nodes, function(node) {
     json.nodes.push(node.toJSON());
   });

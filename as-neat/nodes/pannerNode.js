@@ -1,6 +1,6 @@
 
-import Utils from '../utils';
-import Node from './node';
+import Utils from '../utils.js';
+import Node from './node.js';
 
 let name = "PannerNode";
 
