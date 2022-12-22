@@ -22,7 +22,7 @@ class Renderer {
 
   constructor( sampleRate ) {
     this.sampleRate = sampleRate;
-    this.useWorkers = false; TODO: ensure workers work (!) smoothline with node and browser
+    this.useWorkers = false; //TODO: ensure workers work (!) smoothline with node and browser
   }
 
   wireUpAudioGraphAndConnectToAudioContextDestination(
@@ -945,7 +945,7 @@ const channlelData = audioBuffer.getChannelData(0);
 
   async getGainControlArrayRemappedToValueCurveRange( _gainControlArray ) {
 
-    const promise = new Promise( async function(resolve, reject) {
+    const promise = new Promise( async (resolve, reject) => {
 
       let gainControlArray = new Float32Array(_gainControlArray);
 
