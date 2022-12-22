@@ -320,9 +320,14 @@ function getBufferFrequencyUpdatesAccordingToNoteDelta( patch, noteDelta ) {
 }
 
 export function getFrequencyToNoteDelta( freq, noteDelta ) {
-  // https://en.wikipedia.org/wiki/Cent_(music)#Use
-  const cents = 100 * noteDelta;
-  return freq * Math.pow( 2, (cents/1200) );
+  if( typeof noteDelta === 'object' && 'r1' in noteDelta && 'r2' in noteDelta ) {
+    // we have multiplication coefficients for a tuning lattice, r1 and r2, so let's use those
+    return freq * noteDelta.r1 * noteDelta.r2;
+  } else {
+    // https://en.wikipedia.org/wiki/Cent_(music)#Use
+    const cents = 100 * noteDelta;
+    return freq * Math.pow( 2, (cents/1200) );    
+  }
 }
 
 
@@ -337,7 +342,8 @@ function getAudioBuffersForMember(
   renderSpectrograms, // TODO: unused?
   spectrogramDimensions,
   getDataArray,
-  offlineAudioContext
+  offlineAudioContext,
+  audioContext
 ) {
   return new Promise( (resolve, reject) => {
 
@@ -366,7 +372,8 @@ function getAudioBuffersForMember(
       .renderNetworksOutputSamplesAsAudioBuffer(
         memberOutputs, patch, noteDelta, spectrogramDimensions,
         getDataArray,
-        offlineAudioContext
+        offlineAudioContext,
+        audioContext
       )
       .then(
         audioBufferAndCanvas => resolve(audioBufferAndCanvas),

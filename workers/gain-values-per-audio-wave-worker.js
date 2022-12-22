@@ -1,32 +1,35 @@
-import { expose, Transfer } from "threads/worker";
+// import { expose, Transfer } from "threads/worker";
 
-expose(function gainValuesPerAudioWave(audioWaveCount, controlWave ) {
-    const oneWaveFraction = 2 / audioWaveCount; // 2 as -1 to 1 spans two integers
-    const oneWaveMiddleFraction = oneWaveFraction / 2;
-    const waveSpectrumSpans = getSpectrumSpansForAudioWaves(
-        audioWaveCount, oneWaveFraction, oneWaveMiddleFraction );
-    const gainValues = new Map();
-    const controlWaveArray = new Float32Array(controlWave);
-    [...Array(audioWaveCount).keys()].forEach( audioWaveNr => {
-      gainValues.set( audioWaveNr, new Float32Array(controlWaveArray.length) );
-    });
-    controlWaveArray.forEach( (oneSample, sampleIndex) => {
-      for( let [waveNr, spectrum] of waveSpectrumSpans.entries() ) {
-        if( spectrum.start < oneSample && oneSample < spectrum.end ) {
-          let gain = 1 - Math.abs(spectrum.middle - oneSample) / oneWaveFraction;
-          gainValues.get( waveNr )[sampleIndex] = gain;
-        } else {
-          gainValues.get( waveNr )[sampleIndex] = 0;
-        }
-      }
-    });
-    const arrayBuffersToTransfer = [...gainValues.values()].map( gains => gains.buffer );
-    // TODO: optimize:  Node.js / threads.js doesn't seem to support transferring an array of arraybuffers
-    // - as has been possible with web workers - might want to return a concatenated array buffer
-    //  and split it up on the receiving end?
-    // return Transfer( arrayBuffersToTransfer );
-    return arrayBuffersToTransfer;
+export function gainValuesPerAudioWave(audioWaveCount, controlWave ) {
+  const oneWaveFraction = 2 / audioWaveCount; // 2 as -1 to 1 spans two integers
+  const oneWaveMiddleFraction = oneWaveFraction / 2;
+  const waveSpectrumSpans = getSpectrumSpansForAudioWaves(
+      audioWaveCount, oneWaveFraction, oneWaveMiddleFraction );
+  const gainValues = new Map();
+  const controlWaveArray = new Float32Array(controlWave);
+  [...Array(audioWaveCount).keys()].forEach( audioWaveNr => {
+    gainValues.set( audioWaveNr, new Float32Array(controlWaveArray.length) );
   });
+  controlWaveArray.forEach( (oneSample, sampleIndex) => {
+    for( let [waveNr, spectrum] of waveSpectrumSpans.entries() ) {
+      if( spectrum.start < oneSample && oneSample < spectrum.end ) {
+        let gain = 1 - Math.abs(spectrum.middle - oneSample) / oneWaveFraction;
+        gainValues.get( waveNr )[sampleIndex] = gain;
+      } else {
+        gainValues.get( waveNr )[sampleIndex] = 0;
+      }
+    }
+  });
+  const arrayBuffersToTransfer = [...gainValues.values()].map( gains => gains.buffer );
+  // TODO: optimize:  Node.js / threads.js doesn't seem to support transferring an array of arraybuffers
+  // - as has been possible with web workers - might want to return a concatenated array buffer
+  //  and split it up on the receiving end?
+  // return Transfer( arrayBuffersToTransfer );
+  return arrayBuffersToTransfer;
+}
+
+// expose(gainValuesPerAudioWave);
+
 
 // const onmessage = (e) => {
 //
@@ -75,3 +78,5 @@ function getSpectrumSpansForAudioWaves( audioWaveCount, oneWaveFraction, oneWave
 }
 
 // export default onmessage;
+
+// export default '';

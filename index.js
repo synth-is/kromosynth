@@ -12,5 +12,11 @@ export {
 } from "./util/render.js";
 export {
   getNewAudioSynthesisGenome,
-  getNewAudioSynthesisGenomeByMutation
+  getNewAudioSynthesisGenomeByMutation,
+  getGenomeFromGenomeString
 } from "./util/audio-synthesis-genome.js";
+export {
+  getAudioBuffer,
+  normalizeAudioBuffer,
+  getAudioBufferFromGenomeAndMeta
+} from "./util/audio-buffer.js";

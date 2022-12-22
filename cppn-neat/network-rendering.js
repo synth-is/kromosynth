@@ -3,11 +3,15 @@ import { concatenateTypedArrays } from '../util/arrays.js';
 import { getMemberOutputsKey } from '../util/network-output.js';
 import { getFrequencyToNoteDelta } from '../wavekilde.js';
 // import { lerp } from '../util/range';
+import { getAudioBuffer, normalizeAudioBuffer } from '../util/audio-buffer.js';
 import createVirtualAudioGraph from 'virtual-audio-graph';
 import clone from 'clone';  // TODO: replace with import cloneDeep from "lodash/cloneDeep"; ?
 import chroma from 'chroma-js';
 import isString from "lodash-es/isString.js";
 import { spawn, Thread, Worker, Transfer } from "threads"
+// imports for when not using workers - see this.useWorkers
+import {gainValuesPerAudioWave} from "../workers/gain-values-per-audio-wave-worker.js";
+import {remapControlArrayToValueCurveRange} from '../workers/remap-control-array-to-value-curve-range-worker.js';
 
 
 /**
@@ -18,6 +22,7 @@ class Renderer {
 
   constructor( sampleRate ) {
     this.sampleRate = sampleRate;
+    this.useWorkers = false; TODO: ensure workers work (!) smoothline with node and browser
   }
 
   wireUpAudioGraphAndConnectToAudioContextDestination(
@@ -61,7 +66,7 @@ class Renderer {
           resolve( virtualAudioGraph )
         }
         catch (e) {
-          console.log("Error creating virtual audio graph");
+          console.error("Error creating virtual audio graph", e);
           reject("Error creating virtual audio graph:", e);
         }
 
@@ -71,25 +76,33 @@ class Renderer {
     });
   }
 
+
+
   renderNetworksOutputSamplesAsAudioBuffer(
       memberOutputs, patch, noteDelta, spectrogramDimensions,
       getDataArray,
-      audioContext,
+      offlineAudioContext,
+      audioContext
   ) {
-
+console.log("renderNetworksOutputSamplesAsAudioBuffer noteDelta:", noteDelta);
     return new Promise( (resolve, reject) => {
 
       // TODO: move in hardcoded rendering from IndividualContainer
 
       const startAudioCtxInstance = performance.now();
-      let audioContextInstance;
-      if ( audioContext ) {
-        audioContextInstance = audioContext;
+      let offlineAudioContextInstance;
+      if ( offlineAudioContext ) {
+        offlineAudioContextInstance = offlineAudioContext;
       } else {
-        audioContextInstance = new (OfflineAudioContext || webkitOfflineAudioContext)( 1 /*channels*/,
+        offlineAudioContextInstance = new (OfflineAudioContext || webkitOfflineAudioContext)( 1 /*channels*/,
         this.sampleRate * patch.duration, this.sampleRate);
       }
-      
+      let audioContextInstance;
+      if( audioContext ) {
+        audioContextInstance = audioContext;
+      } else {
+        audioContextInstance = new AudioContext();
+      }
       const endAudioCtxInstance = performance.now();
       console.log(`%c instantiating audio context took ${endAudioCtxInstance-startAudioCtxInstance} milliseconds`,'color:darkorange');
 
@@ -97,7 +110,7 @@ class Renderer {
 
       this.wireUpAudioGraphAndConnectToAudioContextDestination(
           memberOutputs, patch, noteDelta,
-          audioContextInstance,
+          offlineAudioContextInstance,
           sampleCount
       ).then( virtualAudioGraph => {
 
@@ -155,32 +168,7 @@ class Renderer {
           const endRenderAudioGraph = performance.now();
           console.log(`%c Rendering audio graph took ${endRenderAudioGraph - startRenderAudioGraph} milliseconds`, 'color:darkorange');
 
-          const bufferChannelData = renderedBuffer.getChannelData(0);
-
-          // ensure values are not outside the [-1, 1] range, to have consistence between DACs and storage in WAV files
-          let minSampleValue = 0, maxSampleValue = 0;
-          bufferChannelData.forEach( (oneSample, sampleIndex) => {
-            if( oneSample < minSampleValue ) {
-              minSampleValue = oneSample;
-            }
-            if( oneSample > maxSampleValue ) {
-              maxSampleValue = oneSample;
-            }
-          });
-          if( minSampleValue < -1 || maxSampleValue > 1 ) {
-            for (var i = 0; i < bufferChannelData.length; i++) {
-              bufferChannelData[i] = remapNumberToRange(bufferChannelData[i], minSampleValue, maxSampleValue, -1, 1 );
-            }
-          }
-
-          // return the data array or re-create an AudioBuffer after the remap
-          let networkIndividualSound;
-          if( getDataArray ) {
-            networkIndividualSound = bufferChannelData;
-          } else {
-            const renderedBufferAfterRemapToRange = this.getAudioBuffer( [bufferChannelData], virtualAudioGraph.audioContext, sampleCount );
-            networkIndividualSound = this.ensureBufferStartsAndEndsAtZero(renderedBufferAfterRemapToRange);
-          }
+          const networkIndividualSound = normalizeAudioBuffer( renderedBuffer, sampleCount, audioContextInstance, getDataArray );
 
           let canvas, canvasCtx, tempCanvas, tempCanvasCtx;
           if( freqDataArrays && spectrogramDimensions ) {
@@ -470,7 +458,7 @@ class Renderer {
               valueCurve = samples;
             }
             if( 'buffer' === oneAudioGraphNodeConn.paramName ) {
-              const audioBuffer = this.getAudioBuffer(
+              const audioBuffer = getAudioBuffer(
                 [valueCurve], audioContext, sampleCount );
 const channlelData = audioBuffer.getChannelData(0);
               paramNameToValueCurve.set(
@@ -554,7 +542,7 @@ const channlelData = audioBuffer.getChannelData(0);
   updateWithTestFMAudioGraph(
     virtualAudioGraph, memberOutputs, audioContext, sampleCount, duration ) {
 
-    const testAudioBuffer = this.getAudioBuffer(
+    const testAudioBuffer = getAudioBuffer(
       [memberOutputs.get(5).samples], audioContext, sampleCount );
     const testDetuneValues = memberOutputs.get(0).samples.map( oneSample => {
       return remapNumberToRange(oneSample, -1, 1, -1000, 1000);
@@ -680,7 +668,7 @@ const channlelData = audioBuffer.getChannelData(0);
       }
 
       let audioSources = audioWaves.map( oneOutput => {
-        return this.getAudioBufferSourceNode(
+        return getAudioBufferSourceNode(
           [oneOutput.samples], offlineCtx, sampleCount );
       });
 
@@ -738,7 +726,7 @@ const channlelData = audioBuffer.getChannelData(0);
 
         }); // gain value curve remapping promise
 
-      }); // gain calculation promise
+      }).bind(this); // gain calculation promise
 
     });
 
@@ -851,82 +839,6 @@ const channlelData = audioBuffer.getChannelData(0);
     return audioWavesSamples;
   }
 
-
-  ensureBufferStartsAndEndsAtZero( buffer ) {
-    const samplesToFadeFromZero = 128;
-    if( 0 != buffer[0] ) {
-      for( let i=0; i < samplesToFadeFromZero; i++ ) {
-        buffer[i] = buffer[i] * (i/samplesToFadeFromZero);
-      }
-    }
-    if( 0 != buffer[buffer.length-1] ) {
-      for( let i=samplesToFadeFromZero; i > 0; --i ) {
-        buffer[buffer.length-i] =
-          buffer[buffer.length-i] * ((i-1) / samplesToFadeFromZero);
-      }
-    }
-    // TODO: this isn't finding sharp carckles such as in https://synth.is/in/01c3h7x73dfqg1fncf4r7wjp1r/10/9/01c83z14pkc78vxxny682j33f4/6000/MTJfMC0wX24xMi00X244LThfbjEwLTEy
-    // if( false /*shouldDoCavemanCrackleRemoval*/ ) {
-    //   const changeThreshold = .1;
-    //   console.log("---buffer.length:",buffer.length, buffer[0], buffer[Math.round(buffer.length/2)]);
-    //   let maxValue = 0;
-    //   let minValue = 0;
-    //   let sharpestChange = 0;
-    //   for( let i=0; i < buffer.length-1; i++ ) {
-    //     const changeBetweenSamples = Math.abs(buffer[i] - buffer[i+1]);
-    //     if( changeBetweenSamples > sharpestChange ) sharpestChange = changeBetweenSamples;
-    //     if( changeThreshold < changeBetweenSamples ) {
-    //       console.log("---change above threshold: ", Math.abs(buffer[i] - buffer[i+1]));
-    //       const maxGapSize = 128;
-    //       let indexWithinChangeThreshold = -1;
-    //       for( let j=i+1; j-i < maxGapSize; j++ ) {
-    //         if( changeThreshold > Math.abs(buffer[i] - buffer[j]) ) {
-    //           indexWithinChangeThreshold = j;
-    //           break;
-    //         }
-    //       }
-    //       if( -1 < indexWithinChangeThreshold ) {
-    //         for( let k=i+1; k < indexWithinChangeThreshold; k++ ) {
-    //           const rangeFraction = k / (indexWithinChangeThreshold - i);
-    //           const kSignal = lerp( buffer[i], buffer[indexWithinChangeThreshold], rangeFraction );
-    //           buffer[k] = kSignal;
-    //         }
-    //       }
-    //       i = indexWithinChangeThreshold + 1;
-    //     }
-    //
-    //     if( buffer[i] < minValue ) minValue = buffer[i];
-    //     if( buffer[i] > maxValue ) maxValue = buffer[i];
-    //
-    //   }
-    //   console.log("---maxValue:", maxValue, ", minValue:", minValue, ", sharpestChange:", sharpestChange);
-    // }
-    return buffer;
-  }
-
-
-  getAudioBuffer( samplesArrays, audioCtx, sampleCount ) {
-
-    let channels = samplesArrays.length;
-
-    let arrayBuffer = audioCtx.createBuffer(
-      channels, sampleCount, audioCtx.sampleRate );
-
-    // Fill the buffer with signals according to the network outputs
-    for( let channel=0; channel < channels; channel++ ) {
-
-      // This gives us the actual ArrayBuffer that contains the data
-      let nowBuffering = arrayBuffer.getChannelData( channel );
-      let networkOutputBuffer = this.ensureBufferStartsAndEndsAtZero(
-        samplesArrays[channel] );
-      for( let i=0; i < sampleCount; i++ ) {
-        nowBuffering[i] = networkOutputBuffer[i];
-      }
-      arrayBuffer.copyToChannel(nowBuffering, channel);
-    }
-    return arrayBuffer;
-  }
-
   getAudioBufferSourceNode( samplesArrays, audioCtx, sampleCount ) {
 
     // Get an AudioBufferSourceNode.
@@ -934,12 +846,10 @@ const channlelData = audioBuffer.getChannelData(0);
     let audioBufferSourceNode = audioCtx.createBufferSource();
     // set the buffer in the AudioBufferSourceNode
     audioBufferSourceNode.buffer =
-      this.getAudioBuffer( samplesArrays, audioCtx, sampleCount );
+      getAudioBuffer( samplesArrays, audioCtx, sampleCount );
 
     return audioBufferSourceNode;
   }
-
-
 
   async spawnMultipleGainValuesPerAudioWaveWorkers( audioWaveCount, controlWave ) {
     // const chunk = Math.round(
@@ -969,11 +879,15 @@ const channlelData = audioBuffer.getChannelData(0);
 
       let controlWave = new Float32Array(_controlWave);
 
-      const gainValuesPerAudioWave = await spawn(new Worker("../workers/gain-values-per-audio-wave-worker.js"));
-      const gainValues = await gainValuesPerAudioWave(audioWaveCount, Transfer(controlWave.buffer));
+      let gainValues;
+      if( this.useWorkers ) {
+        const gainValuesPerAudioWave = await spawn(new Worker("../workers/gain-values-per-audio-wave-worker.js"));
+        gainValues = await gainValuesPerAudioWave(audioWaveCount, Transfer(controlWave.buffer));
 
-      await Thread.terminate(gainValuesPerAudioWave);
-
+        await Thread.terminate(gainValuesPerAudioWave);
+      } else {
+        gainValues = gainValuesPerAudioWave( audioWaveCount, controlWave );
+      }
       resolve( gainValues );
     });
     return promise;
@@ -1035,10 +949,15 @@ const channlelData = audioBuffer.getChannelData(0);
 
       let gainControlArray = new Float32Array(_gainControlArray);
 
-      const remapControlArrayToValueCurveRange = await spawn(new Worker("../workers/remap-control-array-to-value-curve-range-worker.js"));
-      const remappedGainControlArray = await remapControlArrayToValueCurveRange( Transfer(gainControlArray.buffer) );
+      let remappedGainControlArray;
+      if( this.useWorkers ) {
+        const remapControlArrayToValueCurveRange = await spawn(new Worker("../workers/remap-control-array-to-value-curve-range-worker.js"));
+        remappedGainControlArray = await remapControlArrayToValueCurveRange( Transfer(gainControlArray.buffer) );
 
-      await Thread.terminate(remapControlArrayToValueCurveRange);
+        await Thread.terminate(remapControlArrayToValueCurveRange);
+      } else {
+        remappedGainControlArray = remapControlArrayToValueCurveRange(gainControlArray.buffer);
+      }
 
       resolve( remappedGainControlArray );
     });

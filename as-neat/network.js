@@ -1046,7 +1046,7 @@ Network.createFromJSON = async function(json) {
     var nodeParams = typeof json === 'string' ? JSON.parse(json) : json;
     var type = Utils.lowerCaseFirstLetter(nodeParams.name);
 
-    let NodeModule = await import('./nodes/'+type);
+    let NodeModule = await import('./nodes/'+type+'.js');
     let Node = NodeModule['default'];
     let createdNode = new Node(nodeParams);
     createdNodes.push(createdNode);

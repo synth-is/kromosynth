@@ -10,7 +10,8 @@ export function renderAudio(
   asNEATPatch, waveNetwork, duration = 1, noteDelta = 0, velocity = 1, sampleRate,
   reverse,
   asDataArray,
-  offlineAudioContext
+  offlineAudioContext,
+  audioContext
 ) {
   // anomaly handling
   if( Array.isArray(duration) ) duration = duration[0];
@@ -21,7 +22,8 @@ export function renderAudio(
     asNEATPatch, waveNetwork, duration, noteDelta, velocity, sampleRate,
     reverse,
     asDataArray,
-    offlineAudioContext
+    offlineAudioContext,
+    audioContext
   ).then( audioBufferAndCanvas => {
     return audioBufferAndCanvas.audioBuffer
   } );
@@ -31,13 +33,15 @@ export function renderAudioFromPatchAndMember(
   synthIsPatch, waveNetwork, duration, noteDelta, velocity = 1, sampleRate,
   reverse,
   asDataArray,
-  offlineAudioContext
+  offlineAudioContext,
+  audioContext
 ) {
   return renderAudioAndSpectrogramFromPatchAndMember(
     synthIsPatch, waveNetwork, duration, noteDelta, velocity, sampleRate,
     reverse,
     asDataArray,
-    offlineAudioContext
+    offlineAudioContext,
+    audioContext
   ).then(audioBufferAndCanvas => {
     const {audioBuffer} = audioBufferAndCanvas;
     return audioBuffer;
@@ -48,7 +52,8 @@ export function renderAudioAndSpectrogram(
   asNEATPatch, waveNetwork, duration, noteDelta, velocity = 1, sampleRate,
   reverse,
   asDataArray,
-  offlineAudioContext
+  offlineAudioContext,
+  audioContext
 ) {
   const asNEATNetworkJSONString = isString(asNEATPatch) ? asNEATPatch : asNEATPatch.toJSON();
   const synthIsPatch = patchFromAsNEATnetwork( asNEATNetworkJSONString );
@@ -57,7 +62,8 @@ export function renderAudioAndSpectrogram(
     synthIsPatch, waveNetwork, duration, noteDelta, velocity, sampleRate,
     reverse,
     asDataArray,
-    offlineAudioContext
+    offlineAudioContext,
+    audioContext
   );
 }
 
@@ -65,7 +71,8 @@ export function renderAudioAndSpectrogramFromPatchAndMember(
   synthIsPatch, waveNetwork, duration, noteDelta, velocity = 1, sampleRate,
   reverse,
   asDataArray,
-  offlineAudioContext // TODO: offlineAudioContext doesn't seem to be passed in anywhere - remove this?
+  offlineAudioContext,
+  audioContext
 ) {
   return new Promise( (resolve,reject) => {
     startMemberOutputsRendering(
@@ -79,7 +86,8 @@ export function renderAudioAndSpectrogramFromPatchAndMember(
       console.log("memberOutputs",memberOutputs);
       startAudioBuffersRendering(
         memberOutputs, synthIsPatch, duration, noteDelta, sampleRate, asDataArray,
-        offlineAudioContext
+        offlineAudioContext,
+        audioContext
       ).then( audioBufferAndCanvas => resolve( audioBufferAndCanvas ) )
       .catch( e => reject(e) );
     }).catch( e => reject(e) );
@@ -102,7 +110,7 @@ export function wireUpAudioGraphForPatchAndWaveNetwork(
   } else {
     // TODO: we should be storing "synthIsPatch" externally and come here for all published patches,
     // but currently aren't (asNEATPatch is in published patches (2022-10))
-    synthIsPatch = genome.synthIsPatch;
+    synthIsPatch = genome.synthIsPatch || genome.patch;
   }
   return new Promise( (resolve, reject) => {
     startMemberOutputsRendering(
@@ -144,7 +152,8 @@ export function startMemberOutputsRendering(
 
 export function startAudioBuffersRendering(
   memberOutputs, patch, duration, noteDelta, sampleRate, asDataArray,
-  offlineAudioContext
+  offlineAudioContext,
+  audioContext
 ) {
   return getAudioBuffersForMember(
     memberOutputs /*existingMemberOutputs*/,
@@ -158,6 +167,7 @@ export function startAudioBuffersRendering(
     true, // renderSpectrograms
     {width: 600, height: 314}, // spectrogramDimensions
     asDataArray,
-    offlineAudioContext
+    offlineAudioContext,
+    audioContext
   );
 }

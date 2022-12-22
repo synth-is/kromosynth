@@ -1,7 +1,7 @@
-import { expose, Transfer } from "threads/worker";
+// import { expose, Transfer } from "threads/worker";
 import { remapNumberToRange } from '../util/range.js';
 
-expose(function remapControlArrayToValueCurveRange(gainControlArrayBuffer) {
+export function remapControlArrayToValueCurveRange(gainControlArrayBuffer) {
   const gainControlArray = new Float32Array( gainControlArrayBuffer );
   const valueCurve = new Float32Array( gainControlArray.map( oneGainValue => {
     return remapNumberToRange( oneGainValue, -1, 1, 0, 1 );
@@ -9,7 +9,11 @@ expose(function remapControlArrayToValueCurveRange(gainControlArrayBuffer) {
   // return Transfer(valueCurve.buffer);
   // return valueCurve.buffer;
   return valueCurve
-});
+}
+
+// expose(remapControlArrayToValueCurveRange);
+
+
 
 // const onmessage = (e) => {
 
