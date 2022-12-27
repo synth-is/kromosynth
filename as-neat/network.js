@@ -402,7 +402,7 @@ Network.prototype.splitMutation = async function() {
       newNode, inConnection, outConnection, targetParameter,
       targetParameterNodeName;
 
-  let NodeModule = await import('./nodes/'+selectedType);
+  let NodeModule = await import('./nodes/'+selectedType+'.js');
   let Node = NodeModule["default"];
 
 

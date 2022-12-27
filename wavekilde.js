@@ -320,7 +320,7 @@ function getBufferFrequencyUpdatesAccordingToNoteDelta( patch, noteDelta ) {
 }
 
 export function getFrequencyToNoteDelta( freq, noteDelta ) {
-  if( typeof noteDelta === 'object' && 'r1' in noteDelta && 'r2' in noteDelta ) {
+  if( noteDelta && typeof noteDelta === 'object' && 'r1' in noteDelta && 'r2' in noteDelta ) {
     // we have multiplication coefficients for a tuning lattice, r1 and r2, so let's use those
     return freq * noteDelta.r1 * noteDelta.r2;
   } else {

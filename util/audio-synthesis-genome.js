@@ -27,7 +27,9 @@ export async function getNewAudioSynthesisGenomeByMutation(
     evolutionRunId, generationNumber, parentIndex, algorithm, audioCtx,
     probabilityMutatingWaveNetwork = 0.5,
     probabilityMutatingPatch = 0.5,
-    asNEATMutationParams = {}
+    asNEATMutationParams = {},
+    offlineAudioContext,
+    patchFitnessTestDuration
 ) {
   let waveNetwork, asNEATPatch;
   const patchHasNetworkOutputs = genome.asNEATPatch.nodes.filter(
@@ -46,7 +48,13 @@ export async function getNewAudioSynthesisGenomeByMutation(
     do {
       let patchClone = genome.asNEATPatch.clone();
       asNEATPatch = patchClone.mutate( asNEATMutationParams );
-      patchOK = await doesPatchNetworkHaveMinimumFitness(asNEATPatch, waveNetwork, audioCtx);
+      patchOK = await doesPatchNetworkHaveMinimumFitness(
+        asNEATPatch, waveNetwork, 
+        audioCtx,
+        false, // checkDataAmplitude
+        offlineAudioContext,
+        patchFitnessTestDuration
+        );
       if( ! patchOK ) {
         defectivePatches.push( defectivePatches );
       }
@@ -95,18 +103,18 @@ function getInitialPatchASNEAT() {
 
 export async function getGenomeFromGenomeString( genomeString ) {
   const genomePartiallyStringified = JSON.parse(genomeString);
-
+  const genome = genomePartiallyStringified.genome ? genomePartiallyStringified.genome : genomePartiallyStringified;
   const asNEATPatch = await Network.createFromJSON(
-    genomePartiallyStringified.asNEATPatch
+    genome.asNEATPatch
   );
-  const neatOffspring = genomePartiallyStringified.waveNetwork.offspring;
-  genomePartiallyStringified.waveNetwork.offspring = new neatjs.neatGenome(
+  const neatOffspring = genome.waveNetwork.offspring;
+  genome.waveNetwork.offspring = new neatjs.neatGenome(
     `${Math.random()}`,
     neatOffspring.nodes,
     neatOffspring.connections,
     neatOffspring.inputNodeCount,
     neatOffspring.outputNodeCount
   );
-  const waveNetwork = genomePartiallyStringified.waveNetwork;
+  const waveNetwork = genome.waveNetwork;
   return { waveNetwork, asNEATPatch };
 }

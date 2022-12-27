@@ -57,7 +57,7 @@ export function renderAudioAndSpectrogram(
 ) {
   const asNEATNetworkJSONString = isString(asNEATPatch) ? asNEATPatch : asNEATPatch.toJSON();
   const synthIsPatch = patchFromAsNEATnetwork( asNEATNetworkJSONString );
-  console.log("synthIsPatch",synthIsPatch);
+  // console.log("synthIsPatch",synthIsPatch);
   return renderAudioAndSpectrogramFromPatchAndMember(
     synthIsPatch, waveNetwork, duration, noteDelta, velocity, sampleRate,
     reverse,
@@ -83,7 +83,7 @@ export function renderAudioAndSpectrogramFromPatchAndMember(
       velocity,
       reverse
     ).then( memberOutputs => {
-      console.log("memberOutputs",memberOutputs);
+      // console.log("memberOutputs",memberOutputs);
       startAudioBuffersRendering(
         memberOutputs, synthIsPatch, duration, noteDelta, sampleRate, asDataArray,
         offlineAudioContext,

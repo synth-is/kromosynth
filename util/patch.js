@@ -5,14 +5,19 @@ import {
 import { patchFromAsNEATnetwork } from './audio-graph-asNEAT-bridge.js';
 
 export async function doesPatchNetworkHaveMinimumFitness(
-  asNEATNetwork, waveNetworkPopulationMember, audioCtx, checkDataAmplitude
+  asNEATNetwork, waveNetworkPopulationMember, 
+  audioCtx, 
+  // TODO offlineAudioContext
+  checkDataAmplitude,
+  offlineAudioContext,
+  patchFitnessTestDuration
 ) {
   let hasMinimumFitness = false;
   // verify suitability of x by running it through virtualAudioGraph
   const asNEATNetworkJSONString = asNEATNetwork.toJSON();
   const synthIsPatch = patchFromAsNEATnetwork(asNEATNetworkJSONString);
 
-  const duration = 0.1;
+  const duration = patchFitnessTestDuration || 0.1;
   let memberOutputs = await getOutputsForMemberInCurrentPopulation(
     0, // populationIndex - TODO: isn't really used?
     0, // memberIndex - TODO: isn't really used?
@@ -42,7 +47,11 @@ export async function doesPatchNetworkHaveMinimumFitness(
       null, //reverse
       audioCtx.sampleRate, // sample rate
       synthIsPatch,
-      null // spectrogramDimensions
+      false, // renderSpectrograms
+      null, // spectrogramDimensions
+      undefined, // getDataArray
+      offlineAudioContext,
+      audioCtx
     ).catch( e => {
       console.error("getAudioBuffersForMember rejected:", e);
     } );
