@@ -28,7 +28,7 @@ export async function getNewAudioSynthesisGenomeByMutation(
     probabilityMutatingWaveNetwork = 0.5,
     probabilityMutatingPatch = 0.5,
     asNEATMutationParams = {},
-    offlineAudioContext,
+    OfflineAudioContext,
     patchFitnessTestDuration
 ) {
   let waveNetwork, asNEATPatch;
@@ -48,6 +48,17 @@ export async function getNewAudioSynthesisGenomeByMutation(
     do {
       let patchClone = genome.asNEATPatch.clone();
       asNEATPatch = patchClone.mutate( asNEATMutationParams );
+      let offlineAudioContext;
+      if( OfflineAudioContext ) {
+        const SAMPLE_RATE = 44100;
+        offlineAudioContext = new OfflineAudioContext({
+          numberOfChannels: 2,
+          length: SAMPLE_RATE * patchFitnessTestDuration,
+          sampleRate: SAMPLE_RATE,
+        });
+      } else {
+        offlineAudioContext = undefined;
+      }
       patchOK = await doesPatchNetworkHaveMinimumFitness(
         asNEATPatch, waveNetwork, 
         audioCtx,
@@ -56,7 +67,7 @@ export async function getNewAudioSynthesisGenomeByMutation(
         patchFitnessTestDuration
         );
       if( ! patchOK ) {
-        defectivePatches.push( defectivePatches );
+        defectivePatches.push( asNEATPatch );
       }
       patchMutationAttempt++;
     } while( ! patchOK );

@@ -366,8 +366,16 @@ Network.prototype.mutate = function(params) {
         this.lastMutation.objectsChanged);
       lastMutation.changeDescription +=', '+this.lastMutation.changeDescription;
     }
-    else
+    else if( this.lastMutation )
       lastMutation = this.lastMutation;
+    else {
+      // TODO probably here due to recursion in one of the mutation methods?
+      lastMutation = {
+        objectsChanged: [],
+        changeDescription: ""
+      };
+      this.lastMutation = lastMutation;
+    }
   }
 
   this.lastMutation = lastMutation;
