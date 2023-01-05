@@ -57,7 +57,6 @@ export async function doesPatchNetworkHaveMinimumFitness(
     } );
   }
   if( audioBufferAndCanvas && audioBufferAndCanvas.audioBuffer ) {
-    console.log("audioBufferAndCanvas:",audioBufferAndCanvas);
     const audioBuffer = audioBufferAndCanvas.audioBuffer;
     if( audioBuffer ) {
       // we got an audio buffer without an exception being thrown,

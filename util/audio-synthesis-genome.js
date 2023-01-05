@@ -1,6 +1,7 @@
 import Network from '../as-neat/network.js';
 import Evolver from '../cppn-neat/network-evolution.js';
 import { doesPatchNetworkHaveMinimumFitness } from './patch.js';
+import { patchFromAsNEATnetwork } from './audio-graph-asNEAT-bridge.js';
 import neatjs from 'neatjs';
 
 let evolver;
@@ -15,8 +16,9 @@ function getEvolver() {
 export function getNewAudioSynthesisGenome(evolutionRunId, generationNumber, parentIndex) {
   const waveNetwork = initializeWaveNetwork();
   const asNEATPatch = getInitialPatchASNEAT();
+  const virtualAudioGraph = patchFromAsNEATnetwork( asNEATPatch.toJSON() );
   return {
-    waveNetwork, asNEATPatch,
+    waveNetwork, asNEATPatch, virtualAudioGraph,
     evolutionRunId, generationNumber, parentIndex,
     updated: Date.now()
   };
@@ -74,8 +76,9 @@ export async function getNewAudioSynthesisGenomeByMutation(
   } else {
     asNEATPatch = genome.asNEATPatch;
   }
+  const virtualAudioGraph = patchFromAsNEATnetwork( asNEATPatch.toJSON() );
   return {
-    waveNetwork, asNEATPatch,
+    waveNetwork, asNEATPatch, virtualAudioGraph,
     evolutionRunId, generationNumber, parentIndex, algorithm,
     updated: Date.now()
   };
