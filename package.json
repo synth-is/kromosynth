@@ -28,5 +28,9 @@
     "threads": "^1.7.0",
     "virtual-audio-graph": "file:../virtual-audio-graph"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/synth-is/kromosynth"
+  },
   "type": "module"
 }

@@ -18,12 +18,19 @@ let instance = null;
  */
 class Evolver {
 
-  constructor() {
+  constructor( evoParams ) {
 
     setActivationFunctions( cppnjs );
-    setActivationFunctionsDefaultProbabilities( cppnjs );
 
-    this.iecGenerator = this._instantiateIECGenerator();
+    let activationFunctionProbabilities;
+    if( evoParams && evoParams["activationFunctionProbabilities"] ) {
+      activationFunctionProbabilities = evoParams["activationFunctionProbabilities"];
+    } else {
+      activationFunctionProbabilities = undefined;
+    }
+    setActivationFunctionsDefaultProbabilities( cppnjs, activationFunctionProbabilities );
+
+    this.iecGenerator = this._instantiateIECGenerator( evoParams );
 
     /*
       Singleton class inspired by:
@@ -121,30 +128,55 @@ class Evolver {
    * @return {Object} Instance of a neatjs GenericIEC
    *                           https://github.com/OptimusLime/neatjs/blob/master/evolution/iec.js
    */
-  _instantiateIECGenerator() {
+  _instantiateIECGenerator( evoParams ) {
 
     const np = new neatjs.neatParameters();
-    // defaults taken from
-    // https://github.com/OptimusLime/win-gen/blob/d11e6df5e7b8948f292c999ad5e6c24ab0198e23/old/plugins/NEAT/neatPlugin.js#L63
-    // https://github.com/OptimusLime/win-neat/blob/209f00f726457bcb7cd63ccc1ec3b33dec8bbb66/lib/win-neat.js#L20
-    np.pMutateAddConnection = .13;
-    np.pMutateAddNode = .13;
-    np.pMutateDeleteSimpleNeuron = .00;
-    np.pMutateDeleteConnection = .00;
-    np.pMutateConnectionWeights = .72;
-    np.pMutateChangeActivations = .02;
 
-    np.pNodeMutateActivationRate = 0.2;
-    np.connectionWeightRange = 3.0;
-    np.disallowRecurrence = true;
+    if( evoParams && evoParams["neatParameters"] ) {
+      const neatParameters = evoParams["neatParameters"];
 
-    // IEC options taken from
-    // https://github.com/OptimusLime/win-Picbreeder/blob/33366ef1d8bfd13c936313d2fdb2afed66c31309/html/pbHome.html#L95
-    // https://github.com/OptimusLime/win-Picbreeder/blob/33366ef1d8bfd13c936313d2fdb2afed66c31309/html/pbIEC.html#L87
-    const iecOptions = {
-      initialMutationCount : 5,
-      postMutationCount : 5  // AKA mutationsOnCreation
-    };
+      np.pMutateAddConnection = neatParameters.pMutateAddConnection;
+      np.pMutateAddNode = neatParameters.pMutateAddNode;
+      np.pMutateDeleteSimpleNeuron = neatParameters.pMutateDeleteSimpleNeuron;
+      np.pMutateDeleteConnection = neatParameters.pMutateDeleteConnection;
+      np.pMutateConnectionWeights = neatParameters.pMutateConnectionWeights;
+      np.pMutateChangeActivations = neatParameters.pMutateChangeActivations;
+
+      np.pNodeMutateActivationRate = neatParameters.pNodeMutateActivationRate;
+      np.connectionWeightRange = neatParameters.connectionWeightRange;
+      np.disallowRecurrence = neatParameters.disallowRecurrence;
+    } else {
+      // defaults taken from
+      // https://github.com/OptimusLime/win-gen/blob/d11e6df5e7b8948f292c999ad5e6c24ab0198e23/old/plugins/NEAT/neatPlugin.js#L63
+      // https://github.com/OptimusLime/win-neat/blob/209f00f726457bcb7cd63ccc1ec3b33dec8bbb66/lib/win-neat.js#L20
+      np.pMutateAddConnection = .13;
+      np.pMutateAddNode = .13;
+      np.pMutateDeleteSimpleNeuron = .00;
+      np.pMutateDeleteConnection = .00;
+      np.pMutateConnectionWeights = .72;
+      np.pMutateChangeActivations = .02;
+
+      np.pNodeMutateActivationRate = 0.2;
+      np.connectionWeightRange = 3.0;
+      np.disallowRecurrence = true;
+    }
+
+    let iecOptions;
+    if( evoParams && evoParams["iecOptions"] ) {
+      const iecOpt = evoParams["iecOptions"];
+      iecOptions = {
+        initialMutationCount : iecOpt.initialMutationCount,
+        postMutationCount : iecOpt.postMutationCount  // AKA mutationsOnCreation
+      };
+    } else {
+      // IEC options taken from
+      // https://github.com/OptimusLime/win-Picbreeder/blob/33366ef1d8bfd13c936313d2fdb2afed66c31309/html/pbHome.html#L95
+      // https://github.com/OptimusLime/win-Picbreeder/blob/33366ef1d8bfd13c936313d2fdb2afed66c31309/html/pbIEC.html#L87
+      iecOptions = {
+        initialMutationCount : 5,
+        postMutationCount : 5  // AKA mutationsOnCreation
+      };
+    }
 
     const initialPopulationSeeds = this._getInitialPopulationSeeds();
 

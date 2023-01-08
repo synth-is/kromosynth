@@ -6,16 +6,16 @@ import neatjs from 'neatjs';
 
 let evolver;
 
-function getEvolver() {
-  if( ! evolver ) evolver = new Evolver();
+function getEvolver(evoParamsWaveNetwork) {
+  if( ! evolver ) evolver = new Evolver(evoParamsWaveNetwork);
   return evolver;
 }
 
 // returns a new basic individual for synthesizing sound, consisting of
 // a wave generating network and an audio signal patch (accepting wave inputs from the network)
-export function getNewAudioSynthesisGenome(evolutionRunId, generationNumber, parentIndex) {
-  const waveNetwork = initializeWaveNetwork();
-  const asNEATPatch = getInitialPatchASNEAT();
+export function getNewAudioSynthesisGenome(evolutionRunId, generationNumber, parentIndex, evoParams) {
+  const waveNetwork = initializeWaveNetwork( evoParams );
+  const asNEATPatch = getInitialPatchASNEAT( evoParams );
   const virtualAudioGraph = patchFromAsNEATnetwork( asNEATPatch.toJSON() );
   return {
     waveNetwork, asNEATPatch, virtualAudioGraph,
@@ -84,8 +84,9 @@ export async function getNewAudioSynthesisGenomeByMutation(
   };
 }
 
-function initializeWaveNetwork() {
-  let cppnNeatWaveNetwork = getEvolver().getInitialCPPN_NEATgenome();
+function initializeWaveNetwork( evoParams ) {
+  const evoParamsWaveNetwork = getWaveNetworkParamsFromEvoParams( evoParams );
+  let cppnNeatWaveNetwork = getEvolver(evoParamsWaveNetwork).getInitialCPPN_NEATgenome();
 
   // mutation example
   // let i, num;
@@ -99,8 +100,9 @@ function initializeWaveNetwork() {
   return cppnNeatWaveNetwork;
 }
 
-function getInitialPatchASNEAT() {
-  const audioNetwork = new Network({});
+function getInitialPatchASNEAT( evoParams ) {
+  const defaultParameters = getASNEATDefaultParamsFromEvoParams( evoParams );
+  const audioNetwork = new Network(defaultParameters);
 
   // mutation example
   // let i, num;
@@ -115,11 +117,13 @@ function getInitialPatchASNEAT() {
 }
 
 
-export async function getGenomeFromGenomeString( genomeString ) {
+export async function getGenomeFromGenomeString( genomeString, evoParams ) {
   const genomePartiallyStringified = JSON.parse(genomeString);
   const genome = genomePartiallyStringified.genome ? genomePartiallyStringified.genome : genomePartiallyStringified;
+  const defaultParameters = getASNEATDefaultParamsFromEvoParams( evoParams );
   const asNEATPatch = await Network.createFromJSON(
-    genome.asNEATPatch
+    genome.asNEATPatch,
+    defaultParameters
   );
   const neatOffspring = genome.waveNetwork.offspring;
   genome.waveNetwork.offspring = new neatjs.neatGenome(
@@ -131,4 +135,30 @@ export async function getGenomeFromGenomeString( genomeString ) {
   );
   const waveNetwork = genome.waveNetwork;
   return { waveNetwork, asNEATPatch };
+}
+
+
+function getWaveNetworkParamsFromEvoParams( evoParams ) {
+  let evoParamsWaveNetwork;
+  if( evoParams && evoParams["waveNetwork"] ) {
+    evoParamsWaveNetwork = evoParams["waveNetwork"];
+  } else {
+    evoParamsWaveNetwork = undefined;
+  }
+  return evoParamsWaveNetwork;
+}
+function getASNEATDefaultParamsFromEvoParams( evoParams ) {
+  let evoParamsAudioGraph;
+  if( evoParams && evoParams["audioGraph"] ) {
+    evoParamsAudioGraph = evoParams["audioGraph"];
+  } else {
+    evoParamsAudioGraph = undefined;
+  }
+  let defaultParameters;
+  if( evoParamsAudioGraph && evoParamsAudioGraph["defaultParameters"] ) {
+    defaultParameters = evoParamsAudioGraph["defaultParameters"];
+  } else {
+    defaultParameters = {};
+  }
+  return defaultParameters;
 }

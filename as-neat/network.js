@@ -33,7 +33,7 @@ var Network = function(parameters) {
     // let's add the oscillator or wavesorce node first, so it will connect to the gain node
     // - otherwise it might connect directly to outNode
     // (which might not be bad, but might also be good to have this innitial funnel)
-    if( Utils.randomChance(0.5) ) {
+    if( Utils.randomChance(0.5) ) { // TODO: configurable; add option for a coming additive synthesis node
       this.addOscillator();
     } else {
       this.addAudioBufferSource();
@@ -90,6 +90,12 @@ Network.prototype.defaultParameters = {
   // for fm, as opposed to a strict audio connection
   addConnectionFMMutationRate: 0.5,
 
+  // Chance between an Oscillator node or a (CPPN) network output node, when "addOscillator"
+  addOscillatorNetworkOutputVsOscillatorNodeRate: 0.5,
+
+  // Chance between an audio buffer source node or a wavetable node, when "addAudioBufferSource"
+  addAudioBufferSourceVsWavetableNodeRate: 0.5,
+
   evolutionHistory: []
 };
 /*
@@ -119,7 +125,11 @@ Network.prototype.clone = function() {
     connectionMutationRate: _.clone(this.connectionMutationRate),
     nodeMutationInterpolationType: this.nodeMutationInterpolationType,
     nodeMutationRate: _.clone(this.nodeMutationRate),
-    evolutionHistory: _.clone(this.evolutionHistory)
+    evolutionHistory: _.clone(this.evolutionHistory),
+    addOscillatorFMMutationRate: _.clone(this.addOscillatorFMMutationRate),
+    addConnectionFMMutationRate: _.clone(this.addConnectionFMMutationRate),
+    addOscillatorNetworkOutputVsOscillatorNodeRate: _.clone(this.addOscillatorNetworkOutputVsOscillatorNodeRate),
+    addAudioBufferSourceVsWavetableNodeRate: _.clone(this.addAudioBufferSourceVsWavetableNodeRate)
   });
 };
 /**
@@ -497,7 +507,7 @@ Network.prototype.addOscillator = function( force, forceNodeConnection ) {
     Utils.randomChance(this.addOscillatorFMMutationRate)
     && !forceNodeConnection
   ) {
-    if( Utils.randomChance(0.5) ) {
+    if( Utils.randomChance(this.addOscillatorNetworkOutputVsOscillatorNodeRate) ) {
       oscillator = NetworkOutputNode.random();
     } else {
       oscillator = OscillatorNode.random();
@@ -534,7 +544,7 @@ Network.prototype.addOscillator = function( force, forceNodeConnection ) {
   }
   else {
     let isPeriodicOscillator;
-    if( Utils.randomChance(0.5) || "NetworkOutputNode"===force ) {
+    if( Utils.randomChance(this.addOscillatorNetworkOutputVsOscillatorNodeRate) || "NetworkOutputNode"===force ) {
       oscillator = NoteNetworkOutputNode.random();
       isPeriodicOscillator = false;
     } else {
@@ -618,12 +628,11 @@ Network.prototype.addOscillator = function( force, forceNodeConnection ) {
   in one of the current nodes
  */
 Network.prototype.addAudioBufferSource = function() {
-  // TODO: audioBufferSourceNode or Wavetable, half chance
   let audioBufferSource, connection, possibleTargets, target;
 
   var self = this; // TODO: this became necessary after running with Node.js (in browsers was fine  ¯\_(ツ)_/¯ )
 
-  if( Utils.randomChance(0.5) ) {
+  if( Utils.randomChance(this.addAudioBufferSourceVsWavetableNodeRate) ) {
     audioBufferSource = AudioBufferSourceNode.random();
   } else {
     audioBufferSource = WavetableNode.random();
@@ -1046,7 +1055,7 @@ Network.prototype.toJSON = function() {
   });
   return JSON.stringify(json);
 };
-Network.createFromJSON = async function(json) {
+Network.createFromJSON = async function(json, defaultParameters) {
   var obj = typeof json === 'object' ? json : JSON.parse(json),
       createdNodes = [],
       createdConnections = [];
@@ -1077,7 +1086,7 @@ Network.createFromJSON = async function(json) {
 
   obj.nodes = createdNodes;
   obj.connections = createdConnections;
-  return new Network(obj);
+  return new Network({...obj, ...defaultParameters});
 };
 
 export default Network;
