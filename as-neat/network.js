@@ -33,12 +33,15 @@ var Network = function(parameters) {
     // let's add the oscillator or wavesorce node first, so it will connect to the gain node
     // - otherwise it might connect directly to outNode
     // (which might not be bad, but might also be good to have this innitial funnel)
-    if( Utils.randomChance(0.5) ) { // TODO: configurable; add option for a coming additive synthesis node
-      this.addOscillator();
-    } else {
-      this.addAudioBufferSource();
-      this.addOscillator("NetworkOutputNode", true);
-    }
+    const intialNodeCalls = [
+      {weight: this.initialOscillatorChance, element: this.addOscillator},
+      {weight: this.initialAudioBufferSourceChance, element: () => {
+        this.addAudioBufferSource();
+        this.addOscillator("NetworkOutputNode", true);
+      }}
+    ];
+    const initialNodeCall = Utils.weightedSelection(intialNodeCalls);
+    initialNodeCall.call(this);
     this.nodes.push(asNEAT.globalOutNode);
     this.connections.push(new Connection({
       sourceNode: this.nodes[0], // initialGain
@@ -96,6 +99,13 @@ Network.prototype.defaultParameters = {
   // Chance between an audio buffer source node or a wavetable node, when "addAudioBufferSource"
   addAudioBufferSourceVsWavetableNodeRate: 0.5,
 
+  includeNoise: true,
+
+  // initial node chances must add up to 1
+  initialOscillatorChance: 0,
+  initialAudioBufferSourceChance: 1,
+  // TODO: specific parameter for additive synth node?
+
   evolutionHistory: []
 };
 /*
@@ -129,7 +139,8 @@ Network.prototype.clone = function() {
     addOscillatorFMMutationRate: _.clone(this.addOscillatorFMMutationRate),
     addConnectionFMMutationRate: _.clone(this.addConnectionFMMutationRate),
     addOscillatorNetworkOutputVsOscillatorNodeRate: _.clone(this.addOscillatorNetworkOutputVsOscillatorNodeRate),
-    addAudioBufferSourceVsWavetableNodeRate: _.clone(this.addAudioBufferSourceVsWavetableNodeRate)
+    addAudioBufferSourceVsWavetableNodeRate: _.clone(this.addAudioBufferSourceVsWavetableNodeRate),
+    includeNoise: _.clone(this.includeNoise),
   });
 };
 /**
@@ -508,7 +519,7 @@ Network.prototype.addOscillator = function( force, forceNodeConnection ) {
     && !forceNodeConnection
   ) {
     if( Utils.randomChance(this.addOscillatorNetworkOutputVsOscillatorNodeRate) ) {
-      oscillator = NetworkOutputNode.random();
+      oscillator = NetworkOutputNode.random(this.includeNoise);
     } else {
       oscillator = OscillatorNode.random();
     }
@@ -517,9 +528,9 @@ Network.prototype.addOscillator = function( force, forceNodeConnection ) {
     possibleTargets = _.filter(this.nodes, function(node) {
       let connExists = _.find(self.connections, function(conn) { // TODO: reusable function with getPossibleNewConnections or just WET?
         return
-          (conn.sourceNode === oscillator && conn.targetNode === node)
+          (conn.sourceNode.name === oscillator.name && conn.targetNode.name === node.name)
           ||
-          (conn.sourceNode === node && conn.targetNode === oscillator);
+          (conn.sourceNode.name === node.name && conn.targetNode.name === oscillator.name);
       });
       return !connExists
              && "WavetableNode" !== node.name && "AudioBufferSourceNode" !== node.name
@@ -545,7 +556,7 @@ Network.prototype.addOscillator = function( force, forceNodeConnection ) {
   else {
     let isPeriodicOscillator;
     if( Utils.randomChance(this.addOscillatorNetworkOutputVsOscillatorNodeRate) || "NetworkOutputNode"===force ) {
-      oscillator = NoteNetworkOutputNode.random();
+      oscillator = NoteNetworkOutputNode.random(this.includeNoise);
       isPeriodicOscillator = false;
     } else {
       oscillator = NoteOscillatorNode.random();
@@ -554,10 +565,9 @@ Network.prototype.addOscillator = function( force, forceNodeConnection ) {
     // Pick a random non oscillator node
     possibleTargets = _.filter(this.nodes, function(node) {
       let connExists = _.find(self.connections, function(conn) { // TODO: reusable function with getPossibleNewConnections or just WET?
-        return
-          (conn.sourceNode === oscillator && conn.targetNode === node)
+        return (conn.sourceNode.name === oscillator.name && conn.targetNode.name === node.name)
           ||
-          (conn.sourceNode === node && conn.targetNode === oscillator);
+          (conn.sourceNode.name === node.name && conn.targetNode.name === oscillator.name);
       });
       if( isPeriodicOscillator ) {
         return !connExists
@@ -568,10 +578,13 @@ Network.prototype.addOscillator = function( force, forceNodeConnection ) {
                // && node.name !== "OutNode"
          ;
       } else {
-        return !connExists
-               &&
-               (node.name === "WavetableNode"
-               || node.name === "AudioBufferSourceNode")
+        return ( !connExists
+                &&
+                (node.name === "WavetableNode"
+                || node.name === "AudioBufferSourceNode")
+              )
+              || // can connect again to a WavetableNode.buffer prarameter
+              node.name === "WavetableNode"
         ;
         // TODO: then we need to target a buffer parameter
         // and make sure mixWave is connected, as in addConnection
@@ -617,7 +630,8 @@ Network.prototype.addOscillator = function( force, forceNodeConnection ) {
   } else {
     // let's try again
     // TODO: might result in infinite recursion
-    this.addOscillator();
+    // this.addOscillator();
+    // ... it does!
   }
 
   return this;
@@ -643,8 +657,7 @@ Network.prototype.addAudioBufferSource = function() {
 
     possibleTargets = _.filter(this.nodes, function(node) {
       let connExists = _.find(self.connections, function(conn) { // TODO: reusable function with getPossibleNewConnections or just WET?
-        return
-          (conn.sourceNode === audioBufferSource && conn.targetNode === node)
+        return (conn.sourceNode === audioBufferSource && conn.targetNode === node)
           ||
           (conn.sourceNode === node && conn.targetNode === audioBufferSource);
       });
@@ -674,10 +687,9 @@ Network.prototype.addAudioBufferSource = function() {
 
     possibleTargets = _.filter(this.nodes, function(node) {
       let connExists = _.find(self.connections, function(conn) { // TODO: reusable function with getPossibleNewConnections or just WET?
-        return
-          (conn.sourceNode === audioBufferSource && conn.targetNode === node)
+        return (conn.sourceNode.name === audioBufferSource.name && conn.targetNode.name === node.name)
           ||
-          (conn.sourceNode === node && conn.targetNode === audioBufferSource);
+          (conn.sourceNode.name === node.name && conn.targetNode.name === audioBufferSource.name);
       });
       return !connExists
             && node.name !== "OscillatorNode"
@@ -710,7 +722,7 @@ Network.prototype.addAudioBufferSource = function() {
 
 Network.prototype.addWavetableMixWaveConnection = function(targetNode) {
   // const wavetableMixWaveSourceNode = newConnection.sourceNode.clone(); // assume the source node is a *NetworkOutputNode
-  const wavetableMixWaveSourceNode = NetworkOutputNode.random();
+  const wavetableMixWaveSourceNode = NetworkOutputNode.random(); // noise as a mix-wave makes no sense?
   this.nodes.push( wavetableMixWaveSourceNode );
   wavetableMixWaveSourceNode.type = NetworkOutputNode.TYPES[
     Utils.randomIndexIn(0,NetworkOutputNode.TYPES.length-3) // -3 as the noise types occupy the last three slots
@@ -777,7 +789,7 @@ Network.prototype.hasConnectionTargettingMixWaveParameterOfNode = function( targ
   let hasConnectionToMixWaveParameter = false;
   for( const oneConnection of this.connections ) {
     if( targetNode === oneConnection.targetNode &&
-      'mixWave' === oneConnection.targetParameter
+      'mix' === oneConnection.targetParameter
     ) {
       hasConnectionToMixWaveParameter = true;
       break;

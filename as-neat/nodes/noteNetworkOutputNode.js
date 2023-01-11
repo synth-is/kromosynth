@@ -235,8 +235,8 @@ NoteNetworkOutputNode.prototype.toString = function() {
              this.releaseDuration.toFixed(2)+")";
 };
 
-NoteNetworkOutputNode.random = function() {
-  var typeI = Utils.randomIndexIn(0,NetworkOutputNode.TYPES.length),
+NoteNetworkOutputNode.random = function( includeNoise ) {
+  var typeI = Utils.randomIndexIn(0, includeNoise ? NetworkOutputNode.TYPES.length : NetworkOutputNode.TYPES.length - 3),
       noteOffset = Utils.randomIndexIn(-20, 20),
       attackDuration = Utils.randomIn(0.01, 1.0),
       decayDuration = Utils.randomIn(0.01, 1.0),

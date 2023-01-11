@@ -762,7 +762,7 @@ const channlelData = audioBuffer.getChannelData(0);
 
     const functionParams = ['numberOfAudiowaves', 'currentTime', 'duration'];
     const wavetableNodeDefinition = [
-      "zero: ['channelMerger', 'output', {numberOfOutputs: numberOfAudiowaves}]"
+      "zero: ['channelMerger', 'output', {numberOfInputs: numberOfAudiowaves}]"
     ];
     for( let i = 1; i <= numberOfAudiowaves; i++ ) {
       const oneGainValueCurveKey = `gainValueCurve${i}`;
