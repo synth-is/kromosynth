@@ -460,7 +460,6 @@ console.log("renderNetworksOutputSamplesAsAudioBuffer noteDelta:", noteDelta);
             if( 'buffer' === oneAudioGraphNodeConn.paramName ) {
               const audioBuffer = getAudioBuffer(
                 [valueCurve], audioContext, sampleCount );
-const channlelData = audioBuffer.getChannelData(0);
               paramNameToValueCurve.set(
                 `${outputIndex}_${connectionIndex}_${oneAudioGraphNodeConn.paramName}`, audioBuffer );
             } else {

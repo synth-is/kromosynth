@@ -29,6 +29,8 @@ PartialNetworkOutputNode.prototype.defaultParameters = {
   // 1320 + ((1320 / 3) * 0.1) = 1320 + (440 * 0.1) = 1364
   inharmonicityFactor: 0,
 
+  partialNumber: 1,
+
   // ADSR model
   attackDuration: 0.2,
   decayDuration: 0.4,
@@ -97,6 +99,7 @@ PartialNetworkOutputNode.prototype.clone = function() {
     type: this.type,
     frequency: this.frequency,
     inharmonicityFactor: this.inharmonicityFactor,
+    partialNumber: this.partialNumber,
     attackDuration: this.attackDuration,
     decayDuration: this.decayDuration,
     releaseDuration: this.releaseDuration,
@@ -123,6 +126,7 @@ PartialNetworkOutputNode.prototype.getParameters = function() {
     type: PartialNetworkOutputNode.TYPES.nameFor(this.type),
     frequency: this.frequency,
     inharmonicityFactor: this.inharmonicityFactor,
+    partialNumber: this.partialNumber,
     attackDuration: this.attackDuration,
     decayDuration: this.decayDuration,
     releaseDuration: this.releaseDuration,
@@ -168,10 +172,11 @@ PartialNetworkOutputNode.TYPES.nameFor = function(type) {
 PartialNetworkOutputNode.TYPES.indexFor = function(type) {
   return _.indexOf(PartialNetworkOutputNode.TYPES, type);
 };
-PartialNetworkOutputNode.random = function() {
+PartialNetworkOutputNode.random = function( overtoneNr ) {
   var typeI = Utils.randomIndexIn(0, PartialNetworkOutputNode.TYPES.length),
       freq = 440, // not so random! - inharmonicityFactor will possibly affect any fundamental frequency in network-rendering
       inharmonicityFactor = 0,
+      partialNumber = overtoneNr || 1,
       attackDuration = Utils.randomIn(0.01, 1.0),
       decayDuration = Utils.randomIn(0.01, 1.0),
       releaseDuration = Utils.randomIn(0.01, 1.0),
@@ -187,6 +192,7 @@ PartialNetworkOutputNode.random = function() {
     type: PartialNetworkOutputNode.TYPES[typeI],
     frequency: freq,
     inharmonicityFactor,
+    partialNumber,
     attackDuration: attackDuration,
     decayDuration: decayDuration,
     releaseDuration: releaseDuration,

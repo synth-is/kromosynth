@@ -142,7 +142,12 @@ export const patchFromAsNEATnetwork = asNEATnetwork => {
   .map( n => JSON.parse(n) )  // TODO: why is this nested parsing required?
   .filter( n => n.name !== "OutNode")
   .forEach((oneAsNEATNode, i) => {
-    if( "PartialNetworkOutputNode" === oneAsNEATNode.name ) asNEATPartialNetworkOutputNodesJSONMap[oneAsNEATNode.id] = oneAsNEATNode;
+    if(
+      "PartialNetworkOutputNode" === oneAsNEATNode.name
+      || "PartialEnvelopeNetworkOutputNode" === oneAsNEATNode.name
+    ) {
+      asNEATPartialNetworkOutputNodesJSONMap[oneAsNEATNode.id] = oneAsNEATNode;
+    }
     if(
       "NetworkOutputNode" === oneAsNEATNode.name || "NoteNetworkOutputNode" === oneAsNEATNode.name
       || "PartialNetworkOutputNode" === oneAsNEATNode.name || "PartialEnvelopeNetworkOutputNode" === oneAsNEATNode.name
@@ -241,22 +246,25 @@ export const patchFromAsNEATnetwork = asNEATnetwork => {
       }
       // TODO: intermediary "-weight" gain nodes here, as above for inter-audioGraph connections?
       // - or let the range parameter suffice?
-      
-      // a bit of brute force search and ugliness:
+
+      // grab parameter values from partial (overtone) network outputs (collected in a nodes round above):
       let inharmonicityFactor;
-      // const asNEATSourceNode
-      // JSON.parse(asNEATnetwork.nodes.find( oneSourceNode => JSON.parse(oneSourceNode).id === oneAsNEATConnection.sourceNode ));
-      if( asNEATPartialNetworkOutputNodesJSONMap[oneAsNEATConnection.sourceNode] ) {
-        inharmonicityFactor = asNEATPartialNetworkOutputNodesJSONMap[oneAsNEATConnection.sourceNode].inharmonicityFactor;
+      let partialNumber;
+      const asNEATSourceNode = asNEATPartialNetworkOutputNodesJSONMap[oneAsNEATConnection.sourceNode];
+      if( asNEATSourceNode ) {
+        inharmonicityFactor = asNEATSourceNode.inharmonicityFactor;
+        partialNumber = asNEATSourceNode.partialNumber;
       } else {
         inharmonicityFactor = undefined;
+        partialNumber = undefined;
       }
 
       networkOutput.audioGraphNodes[oneAsNEATConnection.targetNode].push({
         "paramName": oneAsNEATConnection.targetParameter,
         "range": oneAsNEATConnection.targetParameterRange, // [] modified asNEAT mutates this
         "weight": oneAsNEATConnection.weight, // considered in calculation of value curves (for additiveNodes) in network-rendering (Renderer).
-        inharmonicityFactor // skews partial integer-multiplicity-harmony in calculations in network-rendering
+        inharmonicityFactor, // skews partial integer-multiplicity-harmony in calculations in network-rendering
+        partialNumber // used as basis (along with inharmonicityFactor) for calculating harmonic series
       });
       // networkOutputs to audioGraph targets bookkeeping, to be able to determine need for merging the networkOutput values
       if( ! audioGraphTargetsToNetworkOutputs[oneAsNEATConnection.targetNode] ) {

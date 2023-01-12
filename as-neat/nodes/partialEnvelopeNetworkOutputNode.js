@@ -24,6 +24,8 @@ PartialEnvelopeNetworkOutputNode.prototype.defaultParameters = {
 
   frequency: 1,
 
+  partialNumber: 1,
+
   // ADSR model
   attackDuration: 0.2,
   decayDuration: 0.4,
@@ -93,6 +95,7 @@ PartialEnvelopeNetworkOutputNode.prototype.clone = function() {
     id: this.id,
     type: this.type,
     frequency: this.frequency,
+    partialNumber: this.partialNumber,
     attackDuration: this.attackDuration,
     decayDuration: this.decayDuration,
     releaseDuration: this.releaseDuration,
@@ -116,6 +119,7 @@ PartialEnvelopeNetworkOutputNode.prototype.getParameters = function() {
     id: this.id,
     type: PartialNetworkOutputNode.TYPES.nameFor(this.type),
     frequency: this.frequency,
+    partialNumber: this.partialNumber,
     attackDuration: this.attackDuration,
     decayDuration: this.decayDuration,
     releaseDuration: this.releaseDuration,
@@ -133,8 +137,9 @@ PartialEnvelopeNetworkOutputNode.prototype.toString = function() {
              this.releaseDuration.toFixed(2)+")";
 };
 
-PartialEnvelopeNetworkOutputNode.random = function() {
+PartialEnvelopeNetworkOutputNode.random = function( overtoneNr ) {
   var typeI = Utils.randomIndexIn(0, PartialNetworkOutputNode.TYPES.length),
+      partialNumber = overtoneNr || 1,
       attackDuration = Utils.randomIn(0.01, 1.0),
       decayDuration = Utils.randomIn(0.01, 1.0),
       releaseDuration = Utils.randomIn(0.01, 1.0),
@@ -143,6 +148,7 @@ PartialEnvelopeNetworkOutputNode.random = function() {
 
   return new PartialEnvelopeNetworkOutputNode({
     type: PartialNetworkOutputNode.TYPES[typeI],
+    partialNumber,
     attackDuration: attackDuration,
     decayDuration: decayDuration,
     releaseDuration: releaseDuration,

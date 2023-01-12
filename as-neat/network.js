@@ -593,8 +593,12 @@ Network.prototype.addPartialAndEnvelope = function() {
   });
   const target = Utils.randomElementIn( possibleTargets );
   if( target ) {
-    const partialNode = PartialNetworkOutputNode.random();
-    const partialGainEnvelopeNode = PartialEnvelopeNetworkOutputNode.random();
+
+    // find how many partials are connected to the target node
+    let partialNumber = 1 + this.getNumberOfPartialBufferConnections( target );
+
+    const partialNode = PartialNetworkOutputNode.random( partialNumber );
+    const partialGainEnvelopeNode = PartialEnvelopeNetworkOutputNode.random( partialNumber );
     const onePartialConnection = new Connection({
       sourceNode: partialNode,
       targetNode: target,
@@ -784,6 +788,16 @@ Network.prototype.hasConnectionTargettingMixWaveParameterOfNode = function( targ
     }
   }
   return hasConnectionToMixWaveParameter;
+}
+
+Network.prototype.getNumberOfPartialBufferConnections = function( targetNode ) {
+  let partialBufferCount = 0;
+  for( const oneConnection of this.connections ) {
+    if( targetNode === oneConnection.targetNode && oneConnection.targetParameter === 'partialBuffer' ) {
+      partialBufferCount++;
+    }
+  }
+  return partialBufferCount;
 }
 
 Network.prototype.getPossibleNewConnections = function(usingFM) {
