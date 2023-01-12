@@ -1,7 +1,4 @@
-
-import Utils from '../utils.js';
 import Node from './node.js';
-import context from '../asNEAT.js';
 import _ from "lodash-es";
 
 let name = "WavetableNode";

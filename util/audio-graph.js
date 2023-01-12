@@ -73,6 +73,13 @@ export const audioGraphNodes = {
       'buffer': null
     }
   },
+  'additive': {
+    'audioParams': {
+      'partialBuffer': null,
+      'partialGainEnvelope': null,
+      'masterGain': {'range':[0, 10]}
+    }
+  },
   'feedbackDelay': {
     'audioParams': {
       'delayTime':  {'range':[0.0, 5.0]},

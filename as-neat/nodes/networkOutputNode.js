@@ -129,56 +129,6 @@ function refresh(contextPair, prefix) {
   this[nodeName] = gainNode;
 }
 
-NetworkOutputNode.prototype.play = function(context, delayTime) {
-  var gainNode = this.node,
-      oscNode = this.oscNode;
-  play.call(this, context, gainNode, oscNode, delayTime);
-};
-NetworkOutputNode.prototype.offlinePlay = function(context) {
-  var gainNode = this.offlineNode,
-      oscNode = this.offlineOscNode;
-  play.call(this, context, gainNode, oscNode);
-};
-
-function play(context, gainNode, oscNode, delayTime) {
-  var self = this,
-      waitTime = this.attackDuration + this.decayDuration + this.sustainDuration,
-      attackVolume = this.attackVolume,
-      attackDuration = this.attackDuration,
-      sustainVolume = this.sustainVolume,
-      decayDuration = this.decayDuration,
-      releaseDuration = this.releaseDuration;
-  if (typeof delayTime === 'undefined') delayTime = 0;
-  NetworkOutputNode.setupEnvelope(context, gainNode, oscNode,
-    attackVolume, attackDuration, sustainVolume, decayDuration, delayTime);
-
-  var timeToRelease = context.currentTime + waitTime;
-  NetworkOutputNode.setupRelease(context, timeToRelease, gainNode, oscNode,
-    releaseDuration, delayTime);
-}
-
-/**
-  Plays a note until the return handler is called
-  @return function stop
-**/
-NetworkOutputNode.prototype.playHold = function(context) {
-  var self = this,
-      waitTime = this.attackDuration + this.decayDuration + this.sustainDuration,
-      gainNode = this.node,
-      oscNode = this.oscNode,
-      attackVolume = this.attackVolume,
-      attackDuration = this.attackDuration,
-      sustainVolume = this.sustainVolume,
-      decayDuration = this.decayDuration,
-      releaseDuration = this.releaseDuration;
-  NetworkOutputNode.setupEnvelope(context, gainNode, oscNode,
-    attackVolume, attackDuration, sustainVolume, decayDuration);
-  return function stop() {
-    var timeToRelease = context.currentTime;
-    NetworkOutputNode.setupRelease(context, timeToRelease, gainNode, oscNode, releaseDuration);
-  };
-};
-
 NetworkOutputNode.prototype.getParameters = function() {
   return {
     name: name,

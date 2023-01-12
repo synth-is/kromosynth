@@ -4,8 +4,11 @@ import NoteOscillatorNode from './nodes/noteOscillatorNode.js';
 import OscillatorNode from './nodes/oscillatorNode.js';
 import NetworkOutputNode from './nodes/networkOutputNode.js';
 import NoteNetworkOutputNode from './nodes/noteNetworkOutputNode.js';
+import PartialNetworkOutputNode from './nodes/partialNetworkOutputNode.js';
+import PartialEnvelopeNetworkOutputNode from './nodes/partialEnvelopeNetworkOutputNode.js';
 import AudioBufferSourceNode from './nodes/audioBufferSourceNode.js';
 import WavetableNode from './nodes/wavetableNode.js';
+import AdditiveNode from './nodes/additiveNode.js';
 import OutNode from './nodes/outNode.js';
 import GainNode from './nodes/gainNode.js';
 import Connection from './connection.js';
@@ -40,7 +43,7 @@ var Network = function(parameters) {
         this.addOscillator("NetworkOutputNode", true);
       }}
     ];
-    const initialNodeCall = Utils.weightedSelection(intialNodeCalls);
+    const initialNodeCall = Utils.weightedSelection( intialNodeCalls );
     initialNodeCall.call(this);
     this.nodes.push(asNEAT.globalOutNode);
     this.connections.push(new Connection({
@@ -96,15 +99,17 @@ Network.prototype.defaultParameters = {
   // Chance between an Oscillator node or a (CPPN) network output node, when "addOscillator"
   addOscillatorNetworkOutputVsOscillatorNodeRate: 0.5,
 
-  // Chance between an audio buffer source node or a wavetable node, when "addAudioBufferSource"
-  addAudioBufferSourceVsWavetableNodeRate: 0.5,
+  // Rate between audio buffer source node, a wavetable node or additive synthesis node
+  // addAudioBufferSource?Chances must add up to 1
+  addAudioBufferSourceProperChance: 0.3,
+  addAudioBufferSourceWavetableChance: 0.3,
+  addAudioBufferSourceAdditiveChance: 0.4,
 
   includeNoise: true,
 
   // initial node chances must add up to 1
   initialOscillatorChance: 0,
   initialAudioBufferSourceChance: 1,
-  // TODO: specific parameter for additive synth node?
 
   evolutionHistory: []
 };
@@ -216,70 +221,6 @@ Network.prototype.crossWith = function(otherNetwork) {
 };
 
 /**
-  @param afterPrepHandler (optional) Called after all the nodes are refreshed and connected
-    but before they are played.
-*/
-// Network.prototype.play = function(afterPrepHandler, delayTime) {
-//   var context = asNEAT.context;
-//   playPrep.call(this, afterPrepHandler);
-//
-//   // play the oscillators
-//   _.forEach(this.nodes, function(node) {
-//     if (node.play)
-//       node.play(context, delayTime);
-//   });
-//
-//   return this;
-// };
-
-/**
-  Plays the network until the return handler is called
-  @param afterPrepHandler (optional) Called after all the nodes are refreshed and connected
-    but before they are played.
-  @return function stop
-**/
-// Network.prototype.playHold = function(afterPrepHandler) {
-//   var context = asNEAT.context;
-//   playPrep.call(this, afterPrepHandler);
-//
-//   var stopHandlers = [];
-//
-//   // play the oscillators
-//   _.forEach(this.nodes, function(node) {
-//     if (node.playHold)
-//       stopHandlers.push(node.playHold(context));
-//   });
-//
-//   return function stop() {
-//     _.forEach(stopHandlers, function(handler) {
-//       handler();
-//     });
-//   };
-// };
-
-/**
-  @param callback function(AudioBuffer)
-  @param afterPrepHandler (optional) Called after all the nodes are refreshed and connected
-    but before they are played.
-*/
-// Network.prototype.offlinePlay = function(callback, afterPrepHandler) {
-//   var contextPair = asNEAT.createOfflineContextAndGain();
-//   playPrep.call(this, afterPrepHandler, contextPair, "offlineRefresh", "offlineConnect");
-//   // play the offline oscillators
-//   _.forEach(this.nodes, function(node) {
-//     if (node.offlinePlay)
-//       node.offlinePlay(contextPair.context);
-//   });
-//
-//   contextPair.context.oncomplete = function(e) {
-//     if (typeof callback === "function")
-//       callback(e.renderedBuffer);
-//   };
-//   // TODO: Change to promise once implemented in browsers
-//   contextPair.context.startRendering();
-// };
-
-/**
   @param afterPrepHandler Called after all the nodes are refreshed and connected
     but before they are played.
   @param contextPair {context, globalGain}
@@ -311,11 +252,12 @@ Network.prototype.crossWith = function(otherNetwork) {
 
 /**
  * The various types of mutations listed in evolutionHistory
- * @type {{SPLIT_MUTATION: string, ADD_OSCILLATOR: string, ADD_CONNECTION: string, MUTATE_CONNECTION_WEIGHTS: string, MUTATE_NODE_PARAMETERS: string, CROSSOVER: string, BRANCH: string}}
+ * @type {{SPLIT_MUTATION: string, ADD_OSCILLATOR: string, ADD_PARTIAL_SOURCES: string, ADD_CONNECTION: string, MUTATE_CONNECTION_WEIGHTS: string, MUTATE_NODE_PARAMETERS: string, CROSSOVER: string, BRANCH: string}}
  */
 var EvolutionTypes = {
     SPLIT_MUTATION: 'sm',
     ADD_OSCILLATOR: 'ao',
+    ADD_PARTIAL_SOURCES: 'aps',
     ADD_AUDIO_BUFFER_SOURCE: 'aabs',
     ADD_CONNECTION: 'ac',
     MUTATE_CONNECTION_WEIGHTS: 'mcw',
@@ -345,9 +287,10 @@ Network.prototype.mutate = function(params) {
     mutationDistance: 0.5,
 
     // Chances must add up to 1.0
-    splitMutationChance: 0.2,
+    splitMutationChance: 0.1,
     addOscillatorChance: 0.1,
     addAudioBufferSourceChance: 0.1,
+    addPartialAndEnvelopeChance: 0.1,
     addConnectionChance: 0.2,
     mutateConnectionWeightsChance: 0.2, // 0.25,
     mutateNodeParametersChance: 0.2, // 0.25
@@ -357,6 +300,7 @@ Network.prototype.mutate = function(params) {
     {weight: params.splitMutationChance, element: this.splitMutation},
     {weight: params.addOscillatorChance, element: this.addOscillator},
     {weight: params.addAudioBufferSourceChance, element: this.addAudioBufferSource},
+    {weight: params.addPartialAndEnvelopeChance, element: this.addPartialAndEnvelope},
     {weight: params.addConnectionChance, element: this.addConnection},
     {weight: params.mutateConnectionWeightsChance, element: this.mutateConnectionWeights},
     {weight: params.mutateNodeParametersChance, element: this.mutateNodeParameters}
@@ -454,9 +398,11 @@ Network.prototype.splitMutation = async function() {
     if( "NetworkOutputNode"===newNode.name || "NoteNetworkOutputNode"===newNode.name
       ||
       ( // TODO: same as in getPossibleNewConnections
-        ("WavetableNode"===newNode.name || "AudioBufferSourceNode"===newNode.name)
+        ("WavetableNode"===newNode.name || "AudioBufferSourceNode"===newNode.name || "AdditiveNode"===newNode.name)
           &&
           "NetworkOutputNode"!==conn.sourceNode.name && "NoteNetworkOutputNode"!==conn.sourceNode.name
+          &&
+          "PartialNetworkOutputNode"!==conn.sourceNode.name && "PartialEnvelopeNetworkOutputNode"!==conn.sourceNode.name
       )
     ) {
       // can't connect to a *NetworkOutputNode, try again
@@ -527,13 +473,12 @@ Network.prototype.addOscillator = function( force, forceNodeConnection ) {
     // Pick random node that's connectable to connect to
     possibleTargets = _.filter(this.nodes, function(node) {
       let connExists = _.find(self.connections, function(conn) { // TODO: reusable function with getPossibleNewConnections or just WET?
-        return
-          (conn.sourceNode.name === oscillator.name && conn.targetNode.name === node.name)
+        return (conn.sourceNode === oscillator && conn.targetNode === node)
           ||
-          (conn.sourceNode.name === node.name && conn.targetNode.name === oscillator.name);
+          (conn.sourceNode === node && conn.targetNode === oscillator);
       });
       return !connExists
-             && "WavetableNode" !== node.name && "AudioBufferSourceNode" !== node.name
+             && "WavetableNode" !== node.name && "AudioBufferSourceNode" !== node.name && "AdditiveNode" !== node.name
              && "NetworkOutputNode" !== node.name && "NoteNetworkOutputNode" !== node.name
              && node.connectableParameters
              && node.connectableParameters.length > 0;
@@ -565,15 +510,15 @@ Network.prototype.addOscillator = function( force, forceNodeConnection ) {
     // Pick a random non oscillator node
     possibleTargets = _.filter(this.nodes, function(node) {
       let connExists = _.find(self.connections, function(conn) { // TODO: reusable function with getPossibleNewConnections or just WET?
-        return (conn.sourceNode.name === oscillator.name && conn.targetNode.name === node.name)
+        return (conn.sourceNode === oscillator && conn.targetNode === node)
           ||
-          (conn.sourceNode.name === node.name && conn.targetNode.name === oscillator.name);
+          (conn.sourceNode === node && conn.targetNode === oscillator);
       });
       if( isPeriodicOscillator ) {
         return !connExists
                && node.name !== "OscillatorNode"
                && node.name !== "NoteOscillatorNode"
-               && node.name !== "WavetableNode" && node.name !== "AudioBufferSourceNode"
+               && node.name !== "WavetableNode" && node.name !== "AudioBufferSourceNode" && node.name !== "AdditiveNode"
                && node.name !== "NetworkOutputNode" && node.name !== "NoteNetworkOutputNode"
                // && node.name !== "OutNode"
          ;
@@ -637,6 +582,46 @@ Network.prototype.addOscillator = function( force, forceNodeConnection ) {
   return this;
 };
 
+/**
+ * Adds two networkOutputs specifically targetting AdditiveNodes, as a partial + envelope combination.
+ */
+Network.prototype.addPartialAndEnvelope = function() {
+  const self = this; // TODO: this became necessary after running with Node.js (in browsers was fine  ¯\_(ツ)_/¯ )
+
+  const possibleTargets = _.filter(this.nodes, function(node) {
+    return "AdditiveNode" === node.name;
+  });
+  const target = Utils.randomElementIn( possibleTargets );
+  if( target ) {
+    const partialNode = PartialNetworkOutputNode.random();
+    const partialGainEnvelopeNode = PartialEnvelopeNetworkOutputNode.random();
+    const onePartialConnection = new Connection({
+      sourceNode: partialNode,
+      targetNode: target,
+      targetParameter: 'partialBuffer'
+    });
+    const onePartialEnvelopeConnection = new Connection({
+      sourceNode: partialGainEnvelopeNode,
+      targetNode: target,
+      targetParameter: 'partialGainEnvelope'
+    });
+    this.nodes.push( partialNode );
+    this.nodes.push( partialGainEnvelopeNode );
+    this.connections.push( onePartialConnection );
+    this.connections.push( onePartialEnvelopeConnection );
+
+    this.lastMutation = {
+      objectsChanged: [
+        partialNode, partialGainEnvelopeNode,
+        onePartialConnection, onePartialEnvelopeConnection
+      ],
+      changeDescription: "Added two networkOutputs specifically targetting one AdditiveNode, as a partial + envelope combination."
+    };
+    this.addToEvolutionHistory(EvolutionTypes.ADD_PARTIAL_SOURCES);
+  }
+  return this;
+}
+
 /*
   Adds a single audio buffer source or wavetable node and connects it to a random input
   in one of the current nodes
@@ -646,11 +631,14 @@ Network.prototype.addAudioBufferSource = function() {
 
   var self = this; // TODO: this became necessary after running with Node.js (in browsers was fine  ¯\_(ツ)_/¯ )
 
-  if( Utils.randomChance(this.addAudioBufferSourceVsWavetableNodeRate) ) {
-    audioBufferSource = AudioBufferSourceNode.random();
-  } else {
-    audioBufferSource = WavetableNode.random();
-  }
+  const bufferSourceCalls = [
+    {weight: this.addAudioBufferSourceProperChance, element: AudioBufferSourceNode.random},
+    {weight: this.addAudioBufferSourceWavetableChance, element: WavetableNode.random},
+    {weight: this.addAudioBufferSourceAdditiveChance, element: AdditiveNode.random}
+  ];
+  const bufferSourceCall = Utils.weightedSelection( bufferSourceCalls );
+  audioBufferSource = bufferSourceCall.call(this);
+
   if (Utils.randomChance(this.addOscillatorFMMutationRate)) {
     // Pick random node that's connectable to connect to
     // TODO: same as in addOscillator
@@ -662,7 +650,7 @@ Network.prototype.addAudioBufferSource = function() {
           (conn.sourceNode === node && conn.targetNode === audioBufferSource);
       });
       return !connExists
-            && "WavetableNode" !== node.name && "AudioBufferSourceNode" !== node.name
+            && "WavetableNode" !== node.name && "AudioBufferSourceNode" !== node.name && "AdditiveNode" !== node.name
             && "NetworkOutputNode" !== node.name && "NoteNetworkOutputNode" !== node.name
             && node.connectableParameters
             && node.connectableParameters.length > 0;
@@ -687,14 +675,14 @@ Network.prototype.addAudioBufferSource = function() {
 
     possibleTargets = _.filter(this.nodes, function(node) {
       let connExists = _.find(self.connections, function(conn) { // TODO: reusable function with getPossibleNewConnections or just WET?
-        return (conn.sourceNode.name === audioBufferSource.name && conn.targetNode.name === node.name)
+        return (conn.sourceNode === audioBufferSource && conn.targetNode === node)
           ||
-          (conn.sourceNode.name === node.name && conn.targetNode.name === audioBufferSource.name);
+          (conn.sourceNode === node && conn.targetNode === audioBufferSource);
       });
       return !connExists
             && node.name !== "OscillatorNode"
             && node.name !== "NoteOscillatorNode"
-            && node.name !== "WavetableNode" && node.name !== "AudioBufferSourceNode"
+            && node.name !== "WavetableNode" && node.name !== "AudioBufferSourceNode" && node.name !== "AdditiveNode"
             && node.name !== "NetworkOutputNode" && node.name !== "NoteNetworkOutputNode"
             // && node.name !== "OutNode"
        ;
@@ -714,7 +702,7 @@ Network.prototype.addAudioBufferSource = function() {
       audioBufferSource,
       connection
     ],
-    changeDescription: "Added Audio Buffer Source (AudioBufferSourceNode or WavetableNode)"
+    changeDescription: "Added Audio Buffer Source (AudioBufferSourceNode, WavetableNode or AdditiveNode)"
   };
   this.addToEvolutionHistory(EvolutionTypes.ADD_AUDIO_BUFFER_SOURCE);
   return this;
@@ -832,6 +820,11 @@ Network.prototype.getPossibleNewConnections = function(usingFM) {
 
       if( "NetworkOutputNode"===targetNode.name || "NoteNetworkOutputNode"===targetNode.name ) {
         // console.log("---CANNOT target *NetworkOutputNode");
+        return;
+      }
+
+      if( "PartialNetworkOutputNode"===targetNode.name || "PartialEnvelopeNetworkOutputNode"===targetNode.name ) {
+        // cannot target Partial?NetworkOutputNode;
         return;
       }
 

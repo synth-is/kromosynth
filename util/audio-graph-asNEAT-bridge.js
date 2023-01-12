@@ -137,11 +137,16 @@ export const patchFromAsNEATnetwork = asNEATnetwork => {
   const { nodes, connections } = asNEATnetwork;
   const synthIsPatch = { audioGraph: {}, networkOutputs: [] };
   // console.log("---patchFromAsNEATnetwork asNEATnetwork.nodes:",asNEATnetwork.nodes);
+  let asNEATPartialNetworkOutputNodesJSONMap = {}; // for faster lookup below
   asNEATnetwork.nodes
   .map( n => JSON.parse(n) )  // TODO: why is this nested parsing required?
   .filter( n => n.name !== "OutNode")
   .forEach((oneAsNEATNode, i) => {
-    if( "NetworkOutputNode" === oneAsNEATNode.name || "NoteNetworkOutputNode" === oneAsNEATNode.name ) {
+    if( "PartialNetworkOutputNode" === oneAsNEATNode.name ) asNEATPartialNetworkOutputNodesJSONMap[oneAsNEATNode.id] = oneAsNEATNode;
+    if(
+      "NetworkOutputNode" === oneAsNEATNode.name || "NoteNetworkOutputNode" === oneAsNEATNode.name
+      || "PartialNetworkOutputNode" === oneAsNEATNode.name || "PartialEnvelopeNetworkOutputNode" === oneAsNEATNode.name
+    ) {
       // let networkOutput = getNetworkOutputById( oneAsNEATNode.id, synthIsPatch.networkOutputs );
       let networkOutput = getSynthIsNetworkOutputById( oneAsNEATNode.id, synthIsPatch.networkOutputs );
       if( ! networkOutput ) {
@@ -236,9 +241,22 @@ export const patchFromAsNEATnetwork = asNEATnetwork => {
       }
       // TODO: intermediary "-weight" gain nodes here, as above for inter-audioGraph connections?
       // - or let the range parameter suffice?
+      
+      // a bit of brute force search and ugliness:
+      let inharmonicityFactor;
+      // const asNEATSourceNode
+      // JSON.parse(asNEATnetwork.nodes.find( oneSourceNode => JSON.parse(oneSourceNode).id === oneAsNEATConnection.sourceNode ));
+      if( asNEATPartialNetworkOutputNodesJSONMap[oneAsNEATConnection.sourceNode] ) {
+        inharmonicityFactor = asNEATPartialNetworkOutputNodesJSONMap[oneAsNEATConnection.sourceNode].inharmonicityFactor;
+      } else {
+        inharmonicityFactor = undefined;
+      }
+
       networkOutput.audioGraphNodes[oneAsNEATConnection.targetNode].push({
         "paramName": oneAsNEATConnection.targetParameter,
         "range": oneAsNEATConnection.targetParameterRange, // [] modified asNEAT mutates this
+        "weight": oneAsNEATConnection.weight, // considered in calculation of value curves (for additiveNodes) in network-rendering (Renderer).
+        inharmonicityFactor // skews partial integer-multiplicity-harmony in calculations in network-rendering
       });
       // networkOutputs to audioGraph targets bookkeeping, to be able to determine need for merging the networkOutput values
       if( ! audioGraphTargetsToNetworkOutputs[oneAsNEATConnection.targetNode] ) {
@@ -495,6 +513,8 @@ const getSynthIsNodeNameFromASNeatNodeName = ( asNeatNodeName ) => {
       return "waveShaper";
     case "WavetableNode":
       return "wavetable";
+    case "AdditiveNode":
+      return "additive";
     case "FeedbackDelayNode":
       return "feedbackDelay";
     case "OscillatorNode":
