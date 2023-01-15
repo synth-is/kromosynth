@@ -23,8 +23,6 @@ export async function doesPatchNetworkHaveMinimumFitness(
     0, // memberIndex - TODO: isn't really used?
     duration, // duration
     null, // totalSampleCount
-    false, // addOutputsToAppState,
-    null, // allOutputsFrequency
     null, // outputsToActivate
     null, // noteDelta
     true, // useGPU

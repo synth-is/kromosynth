@@ -9,6 +9,7 @@ import clone from 'clone';
 // inlining the worker seems necessary when visiting react-router path with /:parameters !?!!
 // const ActivationSubWorker = require("worker?inline!../workers/network-activation-sub-worker.js");
 import ActivationSubWorker from "./workers/network-activation-sub-worker.js?worker";
+import { partial } from 'lodash-es';
 
 let activator;
 let renderer;
@@ -37,7 +38,10 @@ function getOutputsForMemberInCurrentPopulation(
 
       if( duration ) currentPatch.duration = duration;
 
-      if( noteDelta && noteDelta != 0 ) {
+      if( true // now we'll always want to do this, as there might be 'partialBuffer' (overtone) connections, not just when:
+        // noteDelta && noteDelta != 0 
+      ) {
+        // TODO: frequencyUpdates aren't used in getPatchWithBufferFrequenciesUpdatedAccordingToNoteDelta
         const frequencyUpdates = getBufferFrequencyUpdatesAccordingToNoteDelta(
           currentPatch, noteDelta );
         currentPatch = getPatchWithBufferFrequenciesUpdatedAccordingToNoteDelta(
@@ -220,6 +224,7 @@ function getPatchWithBufferFrequenciesUpdatedAccordingToNoteDelta(
     if( true ) {
 
       let networkOutputConnectedToBuffer;
+      let networkOutputConnectedToPartialBuffer; // TODO
       let networkOutputConnectedToOtherParams;
       for( let oneNodeKey in oneNetworkOutput.audioGraphNodes ) {
         const oneGraphNodeConnections = oneNetworkOutput.audioGraphNodes[oneNodeKey];
@@ -228,10 +233,7 @@ function getPatchWithBufferFrequenciesUpdatedAccordingToNoteDelta(
             if( ! networkOutputConnectedToBuffer ) {
               networkOutputConnectedToBuffer = {
                 audioGraphNodes: {},
-                frequency: getFrequencyToNoteDelta(
-                  oneNetworkOutput.frequency,
-                  noteDelta
-                ),
+                frequency: oneNetworkOutput.frequency,
                 networkOutput: oneNetworkOutput.networkOutput,
                 id: asNeatUtils.createHash()
               };
@@ -240,6 +242,19 @@ function getPatchWithBufferFrequenciesUpdatedAccordingToNoteDelta(
               networkOutputConnectedToBuffer.audioGraphNodes[oneNodeKey] = new Array();
             }
             networkOutputConnectedToBuffer.audioGraphNodes[oneNodeKey].push( oneConnection );
+          } else if( 'partialBuffer' === oneConnection.paramName ) {
+            if( ! networkOutputConnectedToPartialBuffer ) {
+              networkOutputConnectedToPartialBuffer = {
+                audioGraphNodes: {},
+                frequency: oneNetworkOutput.frequency,
+                networkOutput: oneNetworkOutput.networkOutput,
+                id: asNeatUtils.createHash()
+              };
+            }
+            if( ! networkOutputConnectedToPartialBuffer.audioGraphNodes[oneNodeKey] ) {
+              networkOutputConnectedToPartialBuffer.audioGraphNodes[oneNodeKey] = new Array();
+            }
+            networkOutputConnectedToPartialBuffer.audioGraphNodes[oneNodeKey].push( oneConnection );
           } else {
             if( ! networkOutputConnectedToOtherParams ) {
               networkOutputConnectedToOtherParams = {
@@ -262,6 +277,25 @@ function getPatchWithBufferFrequenciesUpdatedAccordingToNoteDelta(
           noteDelta
         );
         networkOutputs.push( networkOutputConnectedToBuffer );
+      }
+      if( networkOutputConnectedToPartialBuffer ) {
+        // assume that there is just one audioGraphNode in this networkOutput connected to a partialBuffer
+        // TODO sophisticate?
+        const partailBufferConnection = Object.values(networkOutputConnectedToPartialBuffer.audioGraphNodes)[0][0];
+        const frequencyToNoteDelta = getFrequencyToNoteDelta(
+          networkOutputConnectedToPartialBuffer.frequency,
+          noteDelta
+        );
+        if( partailBufferConnection.partialNumber > 1 ) { // non-fundamental overtone
+          networkOutputConnectedToPartialBuffer.frequency = getFrequencyToInharmonicityFactor(
+            frequencyToNoteDelta,
+            partailBufferConnection.partialNumber,
+            partailBufferConnection.inharmonicityFactor
+          );
+        } else {
+          networkOutputConnectedToPartialBuffer.frequency = frequencyToNoteDelta;
+        }
+        networkOutputs.push( networkOutputConnectedToPartialBuffer );
       }
       if( networkOutputConnectedToOtherParams ) {
         networkOutputs.push( networkOutputConnectedToOtherParams );
@@ -330,6 +364,11 @@ export function getFrequencyToNoteDelta( freq, noteDelta ) {
   }
 }
 
+// see comment at the inharmonicityFactor member variable in PartialNetworkOutputNode (partialNetworkOutputNode.js)
+function getFrequencyToInharmonicityFactor( frequency, partialNumber, inharmonicityFactor ) {
+  return frequency * partialNumber + frequency * inharmonicityFactor;
+}
+
 
 ///// audio buffer rendering
 
@@ -348,7 +387,9 @@ function getAudioBuffersForMember(
   return new Promise( (resolve, reject) => {
 
     let patch = patchParam;
-    if( noteDelta && noteDelta != 0 ) {
+    if( true // as in getOutputsForMemberInCurrentPopulation: now we'll always want to do this, as there might be 'partialBuffer' (overtone) connections, not just when:
+      // noteDelta && noteDelta != 0 
+    ) {
       const frequencyUpdates = getBufferFrequencyUpdatesAccordingToNoteDelta(
         patch, noteDelta );
       patch = getPatchWithBufferFrequenciesUpdatedAccordingToNoteDelta(

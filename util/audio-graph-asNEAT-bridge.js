@@ -285,7 +285,8 @@ export const patchFromAsNEATnetwork = asNEATnetwork => {
   // check if a target node has more than one networkOutput
   for( const targetNode in audioGraphTargetsToNetworkOutputs ) {
     if( audioGraphTargetsToNetworkOutputs[targetNode].length > 1 ) {
-      console.log(`${targetNode} has more than one network output:`, audioGraphTargetsToNetworkOutputs[targetNode]);
+      // TODO: would need to check if it is expected for the node to have multiple associated networkOutputs
+      // console.log(`${targetNode} has more than one network output:`, audioGraphTargetsToNetworkOutputs[targetNode]);
       // TODO: merge values of the networkOutputs; should that happen in the 'network-rendering' module?
     }
   }

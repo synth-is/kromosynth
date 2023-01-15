@@ -48,10 +48,11 @@ PartialEnvelopeNetworkOutputNode.prototype.defaultParameters = {
       name: 'frequency',
       mutationDeltaChance: 0.8,
       mutationDeltaInterpolationType: Utils.InterpolationType.EXPONENTIAL,
-      mutationDelta: {min: [1, 10], max: [11, 20]},
-      mutationDeltaAllowableRange: {min: 1, max: 4},
+      mutationDelta: {min: [1, 3], max: [5, 8]},
+      mutationDeltaAllowableRange: {min: 1, max: 20},
       allowDeltaInverse: true,
-      randomMutationRange: {min: 1, max: 20}
+      randomMutationRange: {min: 1, max: 20},
+      discreteMutation: false
     // },{
     //   name: 'attackDuration',
     //   mutationDeltaChance: 0.8,

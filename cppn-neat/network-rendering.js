@@ -288,6 +288,25 @@ console.log("renderNetworksOutputSamplesAsAudioBuffer noteDelta:", noteDelta);
           } else {
             delete graph[oneAudioGraphNodeKey];
           }
+        } else if( 'additive' === nodeType ) {
+
+          const partialBuffers = this.getAdditiveSynthesisPartialBuffersFromPatch(
+            valueCurves
+          );
+          const gainEnvelopes = this.getAdditiveSynthesisPartialGainEnvelopeValueCurvesFromPatch(
+            valueCurves
+          );
+          const partailGainWeights = this.getPartialGainWeightsFromPatch( patch, oneAudioGraphNodeKey );
+
+          const additiveGrahpNode = await this.getAdditiveSynthesisGraphNodeEntry(
+            outputKeys, partialBuffers, gainEnvelopes, partailGainWeights, currentTime, duration
+          );
+
+          if( additiveGrahpNode ) {
+            graph[oneAudioGraphNodeKey] = additiveGrahpNode;
+          } else {
+            delete graph[oneAudioGraphNodeKey];
+          }
 
         } else {
 
@@ -305,10 +324,10 @@ console.log("renderNetworksOutputSamplesAsAudioBuffer noteDelta:", noteDelta);
           });
 
         }
-      } else if( 'wavetable' === nodeType ) {
+      } else if( 'wavetable' === nodeType || 'additive' === nodeType ) {
         // no value curves are present (from networkOutputs) for those custom nodes,
         // so the custom node virtual-audio-graph functions haven't been defined and added to the audio signal graph
-        // (a custom audio graph function actually be returned for feedbackDelay, as it doesn't require samples...)
+        // (a custom audio graph function can actually be returned for feedbackDelay, as it doesn't require samples...)
         // - delete the nodes for now
         delete graph[oneAudioGraphNodeKey];
       }
@@ -462,9 +481,19 @@ console.log("renderNetworksOutputSamplesAsAudioBuffer noteDelta:", noteDelta);
                 [valueCurve], audioContext, sampleCount );
               paramNameToValueCurve.set(
                 `${outputIndex}_${connectionIndex}_${oneAudioGraphNodeConn.paramName}`, audioBuffer );
+            } else if( 'partialBuffer' === oneAudioGraphNodeConn.paramName ) {
+              const audioBuffer = getAudioBuffer(
+                [valueCurve], audioContext, sampleCount );
+              paramNameToValueCurve.set(
+                `partialNumber_${oneAudioGraphNodeConn.partialNumber}_${oneAudioGraphNodeConn.paramName}`, audioBuffer );
+            } else if( 'partialGainEnvelope' === oneAudioGraphNodeConn.paramName ) {
+              paramNameToValueCurve.set(
+                `partialNumber_${oneAudioGraphNodeConn.partialNumber}_${oneAudioGraphNodeConn.paramName}`, valueCurve
+              );
             } else {
               paramNameToValueCurve.set(
-                `${outputIndex}_${connectionIndex}_${oneAudioGraphNodeConn.paramName}`, valueCurve );
+                `${outputIndex}_${connectionIndex}_${oneAudioGraphNodeConn.paramName}`, valueCurve
+              );
             }
           });
           const existingGraphNodeKeyToValueCurvesMap =
@@ -485,6 +514,24 @@ console.log("renderNetworksOutputSamplesAsAudioBuffer noteDelta:", noteDelta);
       }
     });
     return graphNodeKeysToValueCurves;
+  }
+
+  getPartialGainWeightsFromPatch( patch, audioGraphNodeKey ) {
+    // similar round as in getValueCurvesFromPatch, but combining this collection in the loop there would increase the mess, probably with little gain...
+    const partialGainWeights = [];
+    patch.networkOutputs.forEach( (oneOutput, outputIndex) => {
+      for( const oneAudioGraphNodeKey in oneOutput.audioGraphNodes ) {
+        if( audioGraphNodeKey === oneAudioGraphNodeKey ) {
+          oneOutput.audioGraphNodes[audioGraphNodeKey]
+          .forEach( (oneAudioGraphNodeConn, connectionIndex) => {
+            if( oneAudioGraphNodeConn.paramName === 'partialGainEnvelope' ) {
+              partialGainWeights.push( oneAudioGraphNodeConn.weight );    
+            }
+          });
+        }
+      }
+    });
+    return partialGainWeights;
   }
 
   getNoiseSamples( noiseType, sampleCount ) {
@@ -745,6 +792,8 @@ console.log("renderNetworksOutputSamplesAsAudioBuffer noteDelta:", noteDelta);
   }
 
 
+  ///// wavetable
+
   async getGainValueCurvesForWavetable( numberOfAudiowaves, mixWaveSamples ) {
     const gainValues = await this.spawnMultipleGainValuesPerAudioWaveWorkers(
       numberOfAudiowaves, mixWaveSamples
@@ -784,7 +833,7 @@ console.log("renderNetworksOutputSamplesAsAudioBuffer noteDelta:", noteDelta);
 
     const wavetable = new Function( 'params', functionBody );
 
-    const wavetableStringified = wavetable.toString();
+    // const wavetableStringified = wavetable.toString();
 
     return wavetable;
   }
@@ -828,14 +877,94 @@ console.log("renderNetworksOutputSamplesAsAudioBuffer noteDelta:", noteDelta);
 
   getWavetableAudioWavesFromPatch( valueCurves ) {
     // see getValueCurvesFromPatch
-    const audioWavesSamples = [];
-    for( let [paramName, values] of valueCurves.entries() ) {
-      const _paramName = paramName.split('_')[2];
-      if( _paramName === 'buffer' ) {
-        audioWavesSamples.push( values );
-      }
+    return this.getParameterValuesFromValueCurvesMap( 'buffer', valueCurves );
+  }
+
+  getAdditiveSynthesisPartialBuffersFromPatch( valueCurves ) {
+    return this.getParameterValuesFromValueCurvesMap( 'partialBuffer', valueCurves );
+  }
+
+  getAdditiveSynthesisPartialGainEnvelopeValueCurvesFromPatch( valueCurves ) {
+    return this.getParameterValuesFromValueCurvesMap( 'partialGainEnvelope', valueCurves );
+  }
+
+  getParameterValuesFromValueCurvesMap( paramName, valueCurves ) {
+    const paramValues = [];
+    for( let [paramKey, values] of valueCurves.entries() ) {
+      const paramKeyNamePart = paramKey.split('_')[2];
+      if( paramKeyNamePart === paramName ) paramValues.push( values );
     }
-    return audioWavesSamples;
+    return paramValues;
+  }
+
+
+  ///// additive synthesis
+
+  getAdditiveSynthesisAudioNodeFunction( numberOfPartialBufferAndGainValuePairs ) {
+    const functionParams = ['numberOfPartialBufferAndGainValuePairs', 'currentTime', 'duration'];
+    const additiveNodeDefinition = [
+      "zero: ['channelMerger', 'output', {numberOfInputs: numberOfPartialBufferAndGainValuePairs}]"
+    ];
+    for( let i = 1; i <= numberOfPartialBufferAndGainValuePairs; i++ ) {
+      const oneAudioWaveKey = `audioWave${i}`;
+      const oneGainValueCurveKey = `gainValueCurve${i}`;
+      const oneGainWeightKey = `gainWeight${i}`;
+      functionParams.push(oneAudioWaveKey);
+      functionParams.push(oneGainValueCurveKey);
+      functionParams.push(oneGainWeightKey);
+
+      if( 1 < i ) {
+        additiveNodeDefinition.push(
+          `gainWeight${i}: ['gain', 'zero', {gain:${oneGainWeightKey}}]`
+        );
+      } else { 
+        // let's allow the first partial / fundamental frequency always have full constant gain 
+        // (while being affected by a gain envelope as the other overtones)
+        additiveNodeDefinition.push(
+          `gainWeight${i}: ['gain', 'zero', {gain:1}]`
+        );
+      }
+      additiveNodeDefinition.push(
+        `gainValueCurve${i}: ['gain', 'gainWeight${i}', {gain: ['setValueCurveAtTime', ${oneGainValueCurveKey}, currentTime, duration]}]`
+      );
+      additiveNodeDefinition.push(
+        `audioWave${i}: ['bufferSource', 'gainValueCurve${i}', {buffer: ${oneAudioWaveKey}}]`
+      );
+    }
+
+    const functionBody = `
+      const { ${functionParams.join(',')} } = params;
+      return { ${additiveNodeDefinition.join(',')} };
+    `;
+
+    const additiveSynth = new Function( 'params', functionBody );
+    return additiveSynth;
+  }
+
+  async getAdditiveSynthesisGraphNodeEntry(
+    outputKeys, partialBuffers, gainEnvelopes, partailGainWeights, currentTime, duration
+  ) {
+    if( partialBuffers && partialBuffers.length && gainEnvelopes && gainEnvelopes.length ) {
+      const additive = this.getAdditiveSynthesisAudioNodeFunction( partialBuffers.length );
+      const additiveNodeFunctionParameters = {
+        numberOfPartialBufferAndGainValuePairs: partialBuffers.length,
+        currentTime,
+        duration
+      };
+      partialBuffers.forEach( (onePartialBuffer, partialBufferIndex) => {
+        additiveNodeFunctionParameters[`audioWave${partialBufferIndex+1}`] = onePartialBuffer;
+      });
+      gainEnvelopes.forEach( (oneGainEnvelopeValueCurveArray, gainEnvelopeIndex) => {
+        additiveNodeFunctionParameters[`gainValueCurve${gainEnvelopeIndex+1}`] = oneGainEnvelopeValueCurveArray;
+      });
+      partailGainWeights.forEach( (onePartialGainWeight, gainWeightIndex) => {
+        additiveNodeFunctionParameters[`gainWeight${gainWeightIndex+1}`] = onePartialGainWeight;
+      });
+      const additiveNodeEntry = [additive, outputKeys, additiveNodeFunctionParameters];
+      return additiveNodeEntry;
+    } else {
+      return null;
+    }
   }
 
   getAudioBufferSourceNode( samplesArrays, audioCtx, sampleCount ) {
