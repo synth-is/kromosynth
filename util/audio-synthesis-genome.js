@@ -29,17 +29,22 @@ export async function getNewAudioSynthesisGenomeByMutation(
     evolutionRunId, generationNumber, parentIndex, algorithm, audioCtx,
     probabilityMutatingWaveNetwork = 0.5,
     probabilityMutatingPatch = 0.5,
-    asNEATMutationParams = {},
+    asNEATMutationParams = {}, // TODO: this could be obtained from evoParams (below)
+    evoParams,
     OfflineAudioContext,
     patchFitnessTestDuration
 ) {
   let waveNetwork, asNEATPatch;
-  const patchHasNetworkOutputs = genome.asNEATPatch.nodes.filter(
-    n => n.name === "NetworkOutputNode" || n.name === "NoteNetworkOutputNode"
-  ).length > 0;
-  if( Math.random() < probabilityMutatingWaveNetwork && patchHasNetworkOutputs ) {
+  // TODO: the rationale behind this condition needs to be revisited (and then it needs to include PartialEnvelopeNetworkOutputNode and PartialNetworkOutputNode)
+  // const patchHasNetworkOutputs = genome.asNEATPatch.nodes.filter(
+  //   n => n.name === "NetworkOutputNode" || n.name === "NoteNetworkOutputNode"
+  // ).length > 0;
+  if( Math.random() < probabilityMutatingWaveNetwork 
+    // && patchHasNetworkOutputs 
+  ) {
     // mutate the wave network outputs
-    waveNetwork = getEvolver().getNextCPPN_NEATgenome( [genome.waveNetwork.offspring] );
+    const evoParamsWaveNetwork = getWaveNetworkParamsFromEvoParams( evoParams );
+    waveNetwork = getEvolver(evoParamsWaveNetwork).getNextCPPN_NEATgenome( [genome.waveNetwork.offspring] );
   } else {
     waveNetwork = genome.waveNetwork;
   }

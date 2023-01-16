@@ -11,7 +11,8 @@ export function renderAudio(
   reverse,
   asDataArray,
   offlineAudioContext,
-  audioContext
+  audioContext,
+  useOvertoneInharmonicityFactors
 ) {
   // anomaly handling
   if( Array.isArray(duration) ) duration = duration[0];
@@ -23,7 +24,8 @@ export function renderAudio(
     reverse,
     asDataArray,
     offlineAudioContext,
-    audioContext
+    audioContext,
+    useOvertoneInharmonicityFactors
   ).then( audioBufferAndCanvas => {
     return audioBufferAndCanvas.audioBuffer
   } );
@@ -34,14 +36,16 @@ export function renderAudioFromPatchAndMember(
   reverse,
   asDataArray,
   offlineAudioContext,
-  audioContext
+  audioContext,
+  useOvertoneInharmonicityFactors
 ) {
   return renderAudioAndSpectrogramFromPatchAndMember(
     synthIsPatch, waveNetwork, duration, noteDelta, velocity, sampleRate,
     reverse,
     asDataArray,
     offlineAudioContext,
-    audioContext
+    audioContext,
+    useOvertoneInharmonicityFactors
   ).then(audioBufferAndCanvas => {
     const {audioBuffer} = audioBufferAndCanvas;
     return audioBuffer;
@@ -53,7 +57,8 @@ export function renderAudioAndSpectrogram(
   reverse,
   asDataArray,
   offlineAudioContext,
-  audioContext
+  audioContext,
+  useOvertoneInharmonicityFactors
 ) {
   const asNEATNetworkJSONString = isString(asNEATPatch) ? asNEATPatch : asNEATPatch.toJSON();
   const synthIsPatch = patchFromAsNEATnetwork( asNEATNetworkJSONString );
@@ -63,7 +68,8 @@ export function renderAudioAndSpectrogram(
     reverse,
     asDataArray,
     offlineAudioContext,
-    audioContext
+    audioContext,
+    useOvertoneInharmonicityFactors
   );
 }
 
@@ -72,7 +78,8 @@ export function renderAudioAndSpectrogramFromPatchAndMember(
   reverse,
   asDataArray,
   offlineAudioContext,
-  audioContext
+  audioContext,
+  useOvertoneInharmonicityFactors
 ) {
   return new Promise( (resolve,reject) => {
     startMemberOutputsRendering(
@@ -81,13 +88,15 @@ export function renderAudioAndSpectrogramFromPatchAndMember(
       noteDelta,
       sampleRate,
       velocity,
-      reverse
+      reverse,
+      useOvertoneInharmonicityFactors
     ).then( memberOutputs => {
       // console.log("memberOutputs",memberOutputs);
       startAudioBuffersRendering(
         memberOutputs, synthIsPatch, duration, noteDelta, sampleRate, asDataArray,
         offlineAudioContext,
-        audioContext
+        audioContext,
+        useOvertoneInharmonicityFactors
       ).then( audioBufferAndCanvas => resolve( audioBufferAndCanvas ) )
       .catch( e => reject(e) );
     }).catch( e => reject(e) );
@@ -131,7 +140,8 @@ export function wireUpAudioGraphForPatchAndWaveNetwork(
 
 // similar to renderedSoundExport.js HoC in synth.is web app, but different (overloaded) methods and param ordering:
 export function startMemberOutputsRendering(
-  member, patch, duration, noteDelta, sampleRate, velocity, reverse
+  member, patch, duration, noteDelta, sampleRate, velocity, reverse,
+  useOvertoneInharmonicityFactors
   // TODO: should we accept audioContext instead of sampleRate, which can be obtained from the former?
 ) {
   return getOutputsForMemberInCurrentPopulation(
@@ -146,14 +156,16 @@ export function startMemberOutputsRendering(
     member, patch,
     velocity,
     undefined, // audioCtx,
-    reverse
+    reverse,
+    useOvertoneInharmonicityFactors
   );
 }
 
 export function startAudioBuffersRendering(
   memberOutputs, patch, duration, noteDelta, sampleRate, asDataArray,
   offlineAudioContext,
-  audioContext
+  audioContext,
+  useOvertoneInharmonicityFactors
 ) {
   return getAudioBuffersForMember(
     memberOutputs /*existingMemberOutputs*/,
@@ -168,6 +180,7 @@ export function startAudioBuffersRendering(
     {width: 600, height: 314}, // spectrogramDimensions
     asDataArray,
     offlineAudioContext,
-    audioContext
+    audioContext,
+    useOvertoneInharmonicityFactors
   );
 }

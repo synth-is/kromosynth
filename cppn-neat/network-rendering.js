@@ -920,6 +920,7 @@ console.log("renderNetworksOutputSamplesAsAudioBuffer noteDelta:", noteDelta);
       } else { 
         // let's allow the first partial / fundamental frequency always have full constant gain 
         // (while being affected by a gain envelope as the other overtones)
+        // TODO: maybe there is no reason to implement this special case?
         additiveNodeDefinition.push(
           `gainWeight${i}: ['gain', 'zero', {gain:1}]`
         );

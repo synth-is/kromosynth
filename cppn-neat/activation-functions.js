@@ -188,21 +188,39 @@ export function setActivationFunctionsDefaultProbabilities( cppnjs, activationFu
   var probs = {};
   // probs[waveActivationFunction.sin] = .25;
 
-  probs[waveActivationFunction.triangle] = activationFunctionProbabilities.triangle || .25;
-  probs[waveActivationFunction.sawtooth] = activationFunctionProbabilities.sawtooth || .25;
-  probs[waveActivationFunction.StepFunction] = activationFunctionProbabilities.StepFunction || .25;
-  probs[waveActivationFunction.Sine] = activationFunctionProbabilities.Sine || .25;
-  probs[waveActivationFunction.Sine2] = activationFunctionProbabilities.Sine2 || .25; // https://www.intmath.com/functions-and-graphs/graphs-using-svg.php?function1=sin(2*x)&function2=&xMin=-5&xMax=5&xGrid=2&yMin=-1&yMax=1.1&yGrid=1&gwidth=290&gheight=130
-
-  probs[waveActivationFunction.cos] = activationFunctionProbabilities.cos || 0;
-  probs[waveActivationFunction.arctan] = activationFunctionProbabilities.arctan || 0;
-  probs[waveActivationFunction.spike] = activationFunctionProbabilities.spike || 0;
-
-  probs[waveActivationFunction.BipolarSigmoid] = activationFunctionProbabilities.BipolarSigmoid || 0; // https://www.intmath.com/functions-and-graphs/graphs-using-svg.php?function1=(2.0+%2F+(1.0+%2B+exp(-4.9+*+x)))+-+1.0&function2=&xMin=-5&xMax=5&xGrid=2&yMin=-1&yMax=1&yGrid=1&gwidth=450&gheight=250
-  probs[waveActivationFunction.PlainSigmoid] = activationFunctionProbabilities.PlainSigmoid || 0; // https://www.intmath.com/functions-and-graphs/graphs-using-svg.php?function1=1.0%2F(1.0%2B(exp(-x)))&function2=&xMin=-5&xMax=5&xGrid=2&yMin=-1&yMax=1&yGrid=1&gwidth=450&gheight=250
-  probs[waveActivationFunction.Gaussian] = activationFunctionProbabilities.Gaussian || 0; // https://www.intmath.com/functions-and-graphs/graphs-using-svg.php?function1=2+*+exp(-(x*2.5)%5E2)+-+1&function2=&xMin=-5&xMax=5&xGrid=2&yMin=-1&yMax=1&yGrid=1&gwidth=450&gheight=250
-  probs[waveActivationFunction.Linear] = activationFunctionProbabilities.Linear || 0; // https://www.intmath.com/functions-and-graphs/graphs-using-svg.php?function1=abs(x)&function2=&xMin=-5&xMax=5&xGrid=2&yMin=-1&yMax=1&yGrid=1&gwidth=450&gheight=250
-  probs[waveActivationFunction.NullFn] = activationFunctionProbabilities.NullFn || 0; // https://www.intmath.com/functions-and-graphs/graphs-using-svg.php?function1=0&function2=&xMin=-5&xMax=5&xGrid=2&yMin=-1&yMax=1&yGrid=1&gwidth=450&gheight=250
+  if( activationFunctionProbabilities ) {
+    probs[waveActivationFunction.triangle] = activationFunctionProbabilities.triangle;
+    probs[waveActivationFunction.sawtooth] = activationFunctionProbabilities.sawtooth;
+    probs[waveActivationFunction.StepFunction] = activationFunctionProbabilities.StepFunction;
+    probs[waveActivationFunction.Sine] = activationFunctionProbabilities.Sine;
+    probs[waveActivationFunction.Sine2] = activationFunctionProbabilities.Sine2; // https://www.intmath.com/functions-and-graphs/graphs-using-svg.php?function1=sin(2*x)&function2=&xMin=-5&xMax=5&xGrid=2&yMin=-1&yMax=1.1&yGrid=1&gwidth=290&gheight=130
+  
+    probs[waveActivationFunction.cos] = activationFunctionProbabilities.cos;
+    probs[waveActivationFunction.arctan] = activationFunctionProbabilities.arctan;
+    probs[waveActivationFunction.spike] = activationFunctionProbabilities.spike;
+  
+    probs[waveActivationFunction.BipolarSigmoid] = activationFunctionProbabilities.BipolarSigmoid; // https://www.intmath.com/functions-and-graphs/graphs-using-svg.php?function1=(2.0+%2F+(1.0+%2B+exp(-4.9+*+x)))+-+1.0&function2=&xMin=-5&xMax=5&xGrid=2&yMin=-1&yMax=1&yGrid=1&gwidth=450&gheight=250
+    probs[waveActivationFunction.PlainSigmoid] = activationFunctionProbabilities.PlainSigmoid; // https://www.intmath.com/functions-and-graphs/graphs-using-svg.php?function1=1.0%2F(1.0%2B(exp(-x)))&function2=&xMin=-5&xMax=5&xGrid=2&yMin=-1&yMax=1&yGrid=1&gwidth=450&gheight=250
+    probs[waveActivationFunction.Gaussian] = activationFunctionProbabilities.Gaussian; // https://www.intmath.com/functions-and-graphs/graphs-using-svg.php?function1=2+*+exp(-(x*2.5)%5E2)+-+1&function2=&xMin=-5&xMax=5&xGrid=2&yMin=-1&yMax=1&yGrid=1&gwidth=450&gheight=250
+    probs[waveActivationFunction.Linear] = activationFunctionProbabilities.Linear; // https://www.intmath.com/functions-and-graphs/graphs-using-svg.php?function1=abs(x)&function2=&xMin=-5&xMax=5&xGrid=2&yMin=-1&yMax=1&yGrid=1&gwidth=450&gheight=250
+    probs[waveActivationFunction.NullFn] = activationFunctionProbabilities.NullFn; // https://www.intmath.com/functions-and-graphs/graphs-using-svg.php?function1=0&function2=&xMin=-5&xMax=5&xGrid=2&yMin=-1&yMax=1&yGrid=1&gwidth=450&gheight=250
+  } else {
+    probs[waveActivationFunction.triangle] = .25;
+    probs[waveActivationFunction.sawtooth] = .25;
+    probs[waveActivationFunction.StepFunction] = .25;
+    probs[waveActivationFunction.Sine] = .25;
+    probs[waveActivationFunction.Sine2] = .25; // https://www.intmath.com/functions-and-graphs/graphs-using-svg.php?function1=sin(2*x)&function2=&xMin=-5&xMax=5&xGrid=2&yMin=-1&yMax=1.1&yGrid=1&gwidth=290&gheight=130
+  
+    probs[waveActivationFunction.cos] = 0;
+    probs[waveActivationFunction.arctan] = 0;
+    probs[waveActivationFunction.spike] = 0;
+  
+    probs[waveActivationFunction.BipolarSigmoid] = 0; // https://www.intmath.com/functions-and-graphs/graphs-using-svg.php?function1=(2.0+%2F+(1.0+%2B+exp(-4.9+*+x)))+-+1.0&function2=&xMin=-5&xMax=5&xGrid=2&yMin=-1&yMax=1&yGrid=1&gwidth=450&gheight=250
+    probs[waveActivationFunction.PlainSigmoid] = 0; // https://www.intmath.com/functions-and-graphs/graphs-using-svg.php?function1=1.0%2F(1.0%2B(exp(-x)))&function2=&xMin=-5&xMax=5&xGrid=2&yMin=-1&yMax=1&yGrid=1&gwidth=450&gheight=250
+    probs[waveActivationFunction.Gaussian] = 0; // https://www.intmath.com/functions-and-graphs/graphs-using-svg.php?function1=2+*+exp(-(x*2.5)%5E2)+-+1&function2=&xMin=-5&xMax=5&xGrid=2&yMin=-1&yMax=1&yGrid=1&gwidth=450&gheight=250
+    probs[waveActivationFunction.Linear] = 0; // https://www.intmath.com/functions-and-graphs/graphs-using-svg.php?function1=abs(x)&function2=&xMin=-5&xMax=5&xGrid=2&yMin=-1&yMax=1&yGrid=1&gwidth=450&gheight=250
+    probs[waveActivationFunction.NullFn] = 0; // https://www.intmath.com/functions-and-graphs/graphs-using-svg.php?function1=0&function2=&xMin=-5&xMax=5&xGrid=2&yMin=-1&yMax=1&yGrid=1&gwidth=450&gheight=250
+  }  
 
   cppnjs.cppnActivationFactory.setProbabilities(probs);
 }

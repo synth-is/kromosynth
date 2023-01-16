@@ -120,7 +120,8 @@ function ensureBufferStartsAndEndsAtZero( buffer ) {
 export async function getAudioBufferFromGenomeAndMeta(
     genomeAndMeta, duration, noteDelta, velocity, reverse, asDataArray,
     offlineAudioContext, // optional
-    audioContext // optional
+    audioContext, // optional
+    useOvertoneInharmonicityFactors
 ) {
     let audioBuffer;
     if( genomeAndMeta.type === "favoriteSound" ) {
@@ -131,7 +132,8 @@ export async function getAudioBufferFromGenomeAndMeta(
             reverse,
             asDataArray,
             offlineAudioContext,
-            audioContext
+            audioContext,
+            useOvertoneInharmonicityFactors
         );
     } else {
         let genome;
@@ -147,7 +149,8 @@ export async function getAudioBufferFromGenomeAndMeta(
             reverse,
             asDataArray,
             offlineAudioContext,
-            audioContext
+            audioContext,
+            useOvertoneInharmonicityFactors
         );
     }
     return audioBuffer;

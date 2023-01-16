@@ -49,9 +49,9 @@ PartialEnvelopeNetworkOutputNode.prototype.defaultParameters = {
       mutationDeltaChance: 0.8,
       mutationDeltaInterpolationType: Utils.InterpolationType.EXPONENTIAL,
       mutationDelta: {min: [1, 3], max: [5, 8]},
-      mutationDeltaAllowableRange: {min: 1, max: 20},
+      mutationDeltaAllowableRange: {min: 1, max: 2000}, // TODO controllable?
       allowDeltaInverse: true,
-      randomMutationRange: {min: 1, max: 20},
+      randomMutationRange: {min: 1, max: 2000},
       discreteMutation: false
     // },{
     //   name: 'attackDuration',

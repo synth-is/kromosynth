@@ -24,7 +24,8 @@ function getOutputsForMemberInCurrentPopulation(
   memberParam, patchParam,
   velocity,
   audioCtx,
-  reverse
+  reverse,
+  useOvertoneInharmonicityFactors
 ) {
   return new Promise( (resolve, reject) => {
 
@@ -47,7 +48,9 @@ function getOutputsForMemberInCurrentPopulation(
         currentPatch = getPatchWithBufferFrequenciesUpdatedAccordingToNoteDelta(
           currentPatch,
           frequencyUpdates,
-          noteDelta
+          noteDelta,
+          useOvertoneInharmonicityFactors
+
         );
         if( outputsToActivate ) {
           outputsToActivate = getOutputsToActivateWithBufferFrequenciesUpdatedAccordingToNoteDelta(
@@ -210,6 +213,7 @@ function getPatchWithBufferFrequenciesUpdatedAccordingToNoteDelta(
     patch,
     frequencyUpdates,
     noteDelta,
+    useOvertoneInharmonicityFactors
 ) {
   const modifiedPatch = clone(patch);
 
@@ -287,10 +291,11 @@ function getPatchWithBufferFrequenciesUpdatedAccordingToNoteDelta(
           noteDelta
         );
         if( partailBufferConnection.partialNumber > 1 ) { // non-fundamental overtone
-          networkOutputConnectedToPartialBuffer.frequency = getFrequencyToInharmonicityFactor(
+          networkOutputConnectedToPartialBuffer.frequency = getOvertoneFrequency(
             frequencyToNoteDelta,
             partailBufferConnection.partialNumber,
-            partailBufferConnection.inharmonicityFactor
+            partailBufferConnection.inharmonicityFactor,
+            useOvertoneInharmonicityFactors
           );
         } else {
           networkOutputConnectedToPartialBuffer.frequency = frequencyToNoteDelta;
@@ -365,8 +370,10 @@ export function getFrequencyToNoteDelta( freq, noteDelta ) {
 }
 
 // see comment at the inharmonicityFactor member variable in PartialNetworkOutputNode (partialNetworkOutputNode.js)
-function getFrequencyToInharmonicityFactor( frequency, partialNumber, inharmonicityFactor ) {
-  return frequency * partialNumber + frequency * inharmonicityFactor;
+function getOvertoneFrequency( 
+  frequency, partialNumber, inharmonicityFactor, useOvertoneInharmonicityFactors = true
+) {
+  return frequency * partialNumber + (useOvertoneInharmonicityFactors ? frequency * inharmonicityFactor : 0);
 }
 
 
@@ -382,7 +389,8 @@ function getAudioBuffersForMember(
   spectrogramDimensions,
   getDataArray,
   offlineAudioContext,
-  audioContext
+  audioContext,
+  useOvertoneInharmonicityFactors
 ) {
   return new Promise( (resolve, reject) => {
 
@@ -395,7 +403,8 @@ function getAudioBuffersForMember(
       patch = getPatchWithBufferFrequenciesUpdatedAccordingToNoteDelta(
         patch,
         frequencyUpdates,
-        noteDelta
+        noteDelta,
+        useOvertoneInharmonicityFactors
       );
     }
 
