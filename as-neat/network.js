@@ -144,8 +144,13 @@ Network.prototype.clone = function() {
     addOscillatorFMMutationRate: _.clone(this.addOscillatorFMMutationRate),
     addConnectionFMMutationRate: _.clone(this.addConnectionFMMutationRate),
     addOscillatorNetworkOutputVsOscillatorNodeRate: _.clone(this.addOscillatorNetworkOutputVsOscillatorNodeRate),
-    addAudioBufferSourceVsWavetableNodeRate: _.clone(this.addAudioBufferSourceVsWavetableNodeRate),
     includeNoise: _.clone(this.includeNoise),
+
+    addAudioBufferSourceProperChance: _.clone(this.addAudioBufferSourceProperChance),
+    addAudioBufferSourceWavetableChance: _.clone(this.addAudioBufferSourceWavetableChance),
+    addAudioBufferSourceAdditiveChance: _.clone(this.addAudioBufferSourceAdditiveChance),
+    initialOscillatorChance: _.clone(this.initialOscillatorChance),
+    initialAudioBufferSourceChance: _.clone(this.initialAudioBufferSourceChance)
   });
 };
 /**
@@ -839,6 +844,11 @@ Network.prototype.getPossibleNewConnections = function(usingFM) {
 
       if( "PartialNetworkOutputNode"===targetNode.name || "PartialEnvelopeNetworkOutputNode"===targetNode.name ) {
         // cannot target Partial?NetworkOutputNode;
+        return;
+      }
+
+      if( "AdditiveNode" === targetNode.name ) {
+        // AdditiveNode is only targeted via call to the addPartialAndEnvelope method
         return;
       }
 
