@@ -20,3 +20,9 @@ export {
   normalizeAudioBuffer,
   getAudioBufferFromGenomeAndMeta
 } from "./util/audio-buffer.js";
+
+// audio classification
+export {
+  getClassScoresForGenome,
+  getGenomeClassPredictions
+} from "./util/audio-classification.js";

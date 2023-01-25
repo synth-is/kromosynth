@@ -8,7 +8,7 @@ import createVirtualAudioGraph from 'virtual-audio-graph';
 import clone from 'clone';  // TODO: replace with import cloneDeep from "lodash/cloneDeep"; ?
 import chroma from 'chroma-js';
 import isString from "lodash-es/isString.js";
-import { spawn, Thread, Worker, Transfer } from "threads"
+import { spawn, Thread, Worker, Transfer } from "threads";
 // imports for when not using workers - see this.useWorkers
 import {gainValuesPerAudioWave} from "../workers/gain-values-per-audio-wave-worker.js";
 import {remapControlArrayToValueCurveRange} from '../workers/remap-control-array-to-value-curve-range-worker.js';
@@ -22,7 +22,7 @@ class Renderer {
 
   constructor( sampleRate ) {
     this.sampleRate = sampleRate;
-    this.useWorkers = false; //TODO: ensure workers work (!) smoothline with node and browser
+    this.useWorkers = false; //TODO: ensure workers work (!) smoothly with node and browser
   }
 
   wireUpAudioGraphAndConnectToAudioContextDestination(
@@ -34,6 +34,7 @@ class Renderer {
     return new Promise( (resolve, reject) => {
 
       console.log('Wiring up audio graph...');
+      const startWiringAudioGraph = performance.now();
 
       // getSubtractiveSynthesisExampleGraph();
 
@@ -70,7 +71,8 @@ class Renderer {
           reject("Error creating virtual audio graph:", e);
         }
 
-        console.log('Done wiring up audio graph, will now render.');
+        const endWiringAudioGraph = performance.now();
+        console.log(`Done wiring up audio graph in ${endWiringAudioGraph-startWiringAudioGraph} ms, will now render.`);
       });
 
     });
@@ -164,7 +166,6 @@ console.log("renderNetworksOutputSamplesAsAudioBuffer noteDelta:", noteDelta);
         // Offline rendering of the audio graph to a reusable buffer
         // TODO: assuming virtualAudioGraph.audioContext is offline - verify?
         virtualAudioGraph.audioContext.startRendering().then(function( renderedBuffer ) {
-          console.log('Rendering completed successfully');
           const endRenderAudioGraph = performance.now();
           console.log(`%c Rendering audio graph took ${endRenderAudioGraph - startRenderAudioGraph} milliseconds`, 'color:darkorange');
 
@@ -525,7 +526,7 @@ console.log("renderNetworksOutputSamplesAsAudioBuffer noteDelta:", noteDelta);
           oneOutput.audioGraphNodes[audioGraphNodeKey]
           .forEach( (oneAudioGraphNodeConn, connectionIndex) => {
             if( oneAudioGraphNodeConn.paramName === 'partialGainEnvelope' ) {
-              partialGainWeights.push( oneAudioGraphNodeConn.weight );    
+              partialGainWeights.push( oneAudioGraphNodeConn.weight );
             }
           });
         }
@@ -917,8 +918,8 @@ console.log("renderNetworksOutputSamplesAsAudioBuffer noteDelta:", noteDelta);
         additiveNodeDefinition.push(
           `gainWeight${i}: ['gain', 'zero', {gain:${oneGainWeightKey}}]`
         );
-      } else { 
-        // let's allow the first partial / fundamental frequency always have full constant gain 
+      } else {
+        // let's allow the first partial / fundamental frequency always have full constant gain
         // (while being affected by a gain envelope as the other overtones)
         // TODO: maybe there is no reason to implement this special case?
         additiveNodeDefinition.push(
@@ -1010,10 +1011,10 @@ console.log("renderNetworksOutputSamplesAsAudioBuffer noteDelta:", noteDelta);
 
       let gainValues;
       if( this.useWorkers ) {
-        const gainValuesPerAudioWave = await spawn(new Worker("../workers/gain-values-per-audio-wave-worker.js"));
-        gainValues = await gainValuesPerAudioWave(audioWaveCount, Transfer(controlWave.buffer));
+        const gainValuesPerAudioWaveWorker = await spawn(new Worker("../workers/gain-values-per-audio-wave-worker.js"));
+        gainValues = await gainValuesPerAudioWaveWorker(audioWaveCount, Transfer(controlWave.buffer));
 
-        await Thread.terminate(gainValuesPerAudioWave);
+        await Thread.terminate(gainValuesPerAudioWaveWorker);
       } else {
         gainValues = gainValuesPerAudioWave( audioWaveCount, controlWave );
       }
@@ -1080,10 +1081,10 @@ console.log("renderNetworksOutputSamplesAsAudioBuffer noteDelta:", noteDelta);
 
       let remappedGainControlArray;
       if( this.useWorkers ) {
-        const remapControlArrayToValueCurveRange = await spawn(new Worker("../workers/remap-control-array-to-value-curve-range-worker.js"));
-        remappedGainControlArray = await remapControlArrayToValueCurveRange( Transfer(gainControlArray.buffer) );
+        const remapControlArrayToValueCurveRangeWorker = await spawn(new Worker("../workers/remap-control-array-to-value-curve-range-worker.js"));
+        remappedGainControlArray = await remapControlArrayToValueCurveRangeWorker( Transfer(gainControlArray.buffer) );
 
-        await Thread.terminate(remapControlArrayToValueCurveRange);
+        await Thread.terminate(remapControlArrayToValueCurveRangeWorker);
       } else {
         remappedGainControlArray = remapControlArrayToValueCurveRange(gainControlArray.buffer);
       }

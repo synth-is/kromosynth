@@ -60,18 +60,18 @@ async function initializeEssentia( graphModel, useGPU ) {
   console.log('Model has been loaded!', model);
 }
 
-onmessage = async (e) => {
+export async function featureExtractionAndInference( audioData, graphModel, useGPU ) {
   if( e.data.graphModel !== _graphModel ) {
-    await initializeEssentia( e.data.graphModel, e.data.useGPU );
+    await initializeEssentia( graphModel, useGPU );
   }
 
-  console.log("e.data.audioData",e.data.audioData);
+  console.log("audioData", audioData);
 
   let features;
   try {
-    features = await extractor.computeFrameWise(e.data.audioData, 256);
+    features = await extractor.computeFrameWise(audioData, 256);
   } catch (e) {
-    postMessage({ error: e });
+    return { error: e };
   }
 
   // const features = await extractor.computeFrameWise(e.data.audioData, 400);
@@ -94,7 +94,48 @@ onmessage = async (e) => {
       let topPredictions = predictions.slice(-5);
       let taggedTopPredictions = modelTags.filter(label => topPredictions.includes(taggedPredictions[label]));
 
-      postMessage({ taggedPredictions, taggedTopPredictions });
+      return { taggedPredictions, taggedTopPredictions };
     } );
+  } else {
+    return undefined;
   }
 }
+
+// onmessage = async (e) => {
+//   if( e.data.graphModel !== _graphModel ) {
+//     await initializeEssentia( e.data.graphModel, e.data.useGPU );
+//   }
+
+//   console.log("e.data.audioData",e.data.audioData);
+
+//   let features;
+//   try {
+//     features = await extractor.computeFrameWise(e.data.audioData, 256);
+//   } catch (e) {
+//     postMessage({ error: e });
+//   }
+
+//   // const features = await extractor.computeFrameWise(e.data.audioData, 400);
+//   console.log("features",features);
+//   // postMessage({features});
+
+//   // await musicnn.initialize();
+//   // console.log("model",model);
+//   // const predictions = await model.predict(features, true);
+//   // console.log("predictions");
+
+//   if( features ) {
+//     model.predict(features, true).then(predictions => {
+//       predictions = predictions[0]; // model.predict returns a [Array(50)]
+//       let taggedPredictions = {};
+//       predictions.map( (p, i) => { taggedPredictions[modelTags[i]] = p; return 0} );
+//       predictions.sort();
+//       // console.log("predictions", predictions);
+
+//       let topPredictions = predictions.slice(-5);
+//       let taggedTopPredictions = modelTags.filter(label => topPredictions.includes(taggedPredictions[label]));
+
+//       postMessage({ taggedPredictions, taggedTopPredictions });
+//     } );
+//   }
+// }
