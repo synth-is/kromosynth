@@ -139,7 +139,10 @@ export async function getGenomeFromGenomeString( genomeString, evoParams ) {
     neatOffspring.outputNodeCount
   );
   const waveNetwork = genome.waveNetwork;
-  return { waveNetwork, asNEATPatch };
+  return { 
+    id: genomePartiallyStringified._id,
+    waveNetwork, asNEATPatch 
+  };
 }
 
 
