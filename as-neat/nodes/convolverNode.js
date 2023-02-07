@@ -2,6 +2,8 @@
 import Utils from '../utils.js';
 import Node from './node.js';
 import asNEAT from '../asNEAT.js';
+import _ from "lodash-es";
+
 let {context} = asNEAT;
 let name = "ConvolverNode";
 

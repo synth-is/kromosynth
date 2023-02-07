@@ -224,7 +224,9 @@ console.log("renderNetworksOutputSamplesAsAudioBuffer noteDelta:", noteDelta);
             + err );
         });
 
-      });
+      }).catch( // this.wireUpAudioGraphAndConnectToAudioContextDestination(
+        e => reject( "Error from wireUpAudioGraphAndConnectToAudioContextDestination:" + e )
+      );
 
       // TODO: ...then, dynamic rendering pipeline according to patch
     });
