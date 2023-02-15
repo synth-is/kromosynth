@@ -64,25 +64,25 @@ export async function getClassScoresForGenome(
           offlineAudioContext,
           audioContext
         );
-
-        for( const classKey in predictions.taggedPredictions ) {
-          let isCurrentBestClassCandidate;
-          if( ! predictionsAggregate[classKey] ||
-            predictionsAggregate[classKey].score < predictions.taggedPredictions[classKey]
-          ) {
-            isCurrentBestClassCandidate = true;
-          }
-          if( isCurrentBestClassCandidate ) {
-            const classPrediction = {
-              score: predictions.taggedPredictions[classKey],
-              duration,
-              noteDelta,
-              velocity
-            };
-            predictionsAggregate[classKey] = classPrediction;
+        if( predictions ) {
+          for( const classKey in predictions.taggedPredictions ) {
+            let isCurrentBestClassCandidate;
+            if( ! predictionsAggregate[classKey] ||
+              predictionsAggregate[classKey].score < predictions.taggedPredictions[classKey]
+            ) {
+              isCurrentBestClassCandidate = true;
+            }
+            if( isCurrentBestClassCandidate ) {
+              const classPrediction = {
+                score: predictions.taggedPredictions[classKey],
+                duration,
+                noteDelta,
+                velocity
+              };
+              predictionsAggregate[classKey] = classPrediction;
+            }
           }
         }
-
       }
     }
   }
@@ -112,16 +112,19 @@ export async function getGenomeClassPredictions(
     false, // asDataArray
     offlineAudioContext,
     audioContext
-  );
-  const startGenomeClassPrediction = performance.now();
-  const predictions = await getAudioClasses(
-    audioBuffer, classificationModel, useGPU
-  ).catch( e => location.reload() );
-  // if( predictions === undefined ) { TODO handle in web app
-  //   location.reload();
-  // }
-  const endGenomeClassPrediction = performance.now();
-  console.log(`Computing class predictions for genome ${genome._id} took ${endGenomeClassPrediction-startGenomeClassPrediction} ms.`);
+  ).catch( e => console.error(`Error from renderAudio called form getGenomeClassPredictions, for genomem ${genome._id}`, e ) );
+  let predictions;
+  if( audioBuffer ) {
+    const startGenomeClassPrediction = performance.now();
+    predictions = await getAudioClasses(
+      audioBuffer, classificationModel, useGPU
+    ).catch( e => location.reload() );
+    // if( predictions === undefined ) { TODO handle in web app
+    //   location.reload();
+    // }
+    const endGenomeClassPrediction = performance.now();
+    console.log(`Computing class predictions for genome ${genome._id} took ${endGenomeClassPrediction-startGenomeClassPrediction} ms.`);
+  }
   return predictions;
 }
 

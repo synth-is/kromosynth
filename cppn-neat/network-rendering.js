@@ -86,7 +86,6 @@ class Renderer {
       offlineAudioContext,
       audioContext
   ) {
-console.log("renderNetworksOutputSamplesAsAudioBuffer noteDelta:", noteDelta);
     return new Promise( (resolve, reject) => {
 
       // TODO: move in hardcoded rendering from IndividualContainer

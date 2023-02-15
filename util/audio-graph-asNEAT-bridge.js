@@ -275,21 +275,21 @@ export const patchFromAsNEATnetwork = asNEATnetwork => {
   });
 
   // check if a target node has more than one source
-  for( const targetNode in audioGraphTargetsToSources ) {
-    if( audioGraphTargetsToSources[targetNode].length > 1 ) {
-      console.log(`${targetNode} has more than one source: `, audioGraphTargetsToSources[targetNode]);
-      // TODO: place ChannelmergerNode in between
-    }
-  }
+  // for( const targetNode in audioGraphTargetsToSources ) {
+  //   if( audioGraphTargetsToSources[targetNode].length > 1 ) {
+  //     console.log(`${targetNode} has more than one source: `, audioGraphTargetsToSources[targetNode]);
+  //     // TODO: place ChannelmergerNode in between
+  //   }
+  // }
 
   // check if a target node has more than one networkOutput
-  for( const targetNode in audioGraphTargetsToNetworkOutputs ) {
-    if( audioGraphTargetsToNetworkOutputs[targetNode].length > 1 ) {
-      // TODO: would need to check if it is expected for the node to have multiple associated networkOutputs
-      // console.log(`${targetNode} has more than one network output:`, audioGraphTargetsToNetworkOutputs[targetNode]);
-      // TODO: merge values of the networkOutputs; should that happen in the 'network-rendering' module?
-    }
-  }
+  // for( const targetNode in audioGraphTargetsToNetworkOutputs ) {
+  //   if( audioGraphTargetsToNetworkOutputs[targetNode].length > 1 ) {
+  //     // TODO: would need to check if it is expected for the node to have multiple associated networkOutputs
+  //     // console.log(`${targetNode} has more than one network output:`, audioGraphTargetsToNetworkOutputs[targetNode]);
+  //     // TODO: merge values of the networkOutputs; should that happen in the 'network-rendering' module?
+  //   }
+  // }
 
   // TODO: if multiple network outputs point to the same graph node and parameter
   // add ChannelmergerNode to graph, for fan-in of all the networkOutputs

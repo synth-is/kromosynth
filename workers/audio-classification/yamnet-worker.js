@@ -8,11 +8,14 @@ let _graphModel;
 let model;
 
 async function initializeGraphModel( graphModel, useGPU ) {
+  console.log("Initializing YAMNet graph model...");
+  const startYamnetInitialization = performance.now();
   _graphModel = graphModel;
   let modelUrl;
   switch (graphModel) {
     case 'yamnet':
-      modelUrl = 'https://tfhub.dev/google/tfjs-model/yamnet/tfjs/1';
+      // modelUrl = 'https://tfhub.dev/google/tfjs-model/yamnet/tfjs/1';
+      modelUrl = 'file:///Users/bjornpjo/Developer/apps/kromosynth/workers/audio-classification/tfjs-model/yamnet/tfjs/1/model.json';
       break;
     default:
       modelUrl = 'https://tfhub.dev/google/tfjs-model/yamnet/tfjs/1';
@@ -20,7 +23,9 @@ async function initializeGraphModel( graphModel, useGPU ) {
   if( !useGPU ) {
     _tf.setBackend('cpu');
   }
-  model = await _tf.loadGraphModel(modelUrl, { fromTFHub: true });
+  model = await _tf.loadGraphModel(modelUrl, { fromTFHub: false });
+  const endYamnetInitialization = performance.now();
+  console.log(`Initialized YAMNet graph model in ${endYamnetInitialization-startYamnetInitialization} ms.`);
 }
 
 export async function getTaggedPredictions( audioData, graphModel, useGPU ) {
