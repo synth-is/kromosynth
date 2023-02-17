@@ -33,7 +33,7 @@ export async function getClassScoresForGenome(
   classScoringDurations = [0.5, 1, 2, 5],
   classScoringNoteDeltas = [-36, -24, -12, 0, 12, 24, 36],
   classScoringVelocities = [0.25, 0.5, 0.75, 1],
-  classificationGraphModel = 'yamnet',
+  classificationGraphModel = 'yamnet', modelUrl,
   useGPU,
   supplyAudioContextInstances
 ) {
@@ -58,7 +58,7 @@ export async function getClassScoresForGenome(
           audioContext = undefined;
         }
         const predictions = await getGenomeClassPredictions(
-          classificationGraphModel,
+          classificationGraphModel, modelUrl,
           genome, duration, noteDelta, velocity,
           useGPU,
           offlineAudioContext,
@@ -98,7 +98,7 @@ export async function getClassScoresForGenome(
 }
 
 export async function getGenomeClassPredictions( 
-    classificationModel, 
+    classificationModel, modelUrl,
     genome, duration, noteDelta, velocity,
     useGPU,
     offlineAudioContext,
@@ -117,7 +117,7 @@ export async function getGenomeClassPredictions(
   if( audioBuffer ) {
     const startGenomeClassPrediction = performance.now();
     predictions = await getAudioClasses(
-      audioBuffer, classificationModel, useGPU
+      audioBuffer, classificationModel, modelUrl, useGPU
     ).catch( e => location.reload() );
     // if( predictions === undefined ) { TODO handle in web app
     //   location.reload();
@@ -131,7 +131,7 @@ export async function getGenomeClassPredictions(
 
 ///// classification from an audio buffer according to a declared classification model
 
-async function getAudioClasses( audioBuffer, classificationModel, useGPU ) {
+async function getAudioClasses( audioBuffer, classificationModel, modelUrl, useGPU ) {
   try {
     switch (classificationModel) {
       // case "msd-musicnn-1":
@@ -139,7 +139,7 @@ async function getAudioClasses( audioBuffer, classificationModel, useGPU ) {
       // case "mtt-musicnn-1":
       //   return getAudioClassesEssentiaJSTensorFlowJS( audioBuffer, "mtt-musicnn-1", useGPU );
       case "yamnet":
-        return getAudioClassesTensorFlowJS( audioBuffer, "yamnet", useGPU );
+        return getAudioClassesTensorFlowJS( audioBuffer, "yamnet", modelUrl, useGPU );
       default:
     }
   } catch (e) {
@@ -177,16 +177,16 @@ function getAudioClassesEssentiaJSTensorFlowJS( audioBuffer, classificationModel
 }
 */
 
-async function getAudioClassesTensorFlowJS( audioBuffer, classificationModel, useGPU = true ) {
+async function getAudioClassesTensorFlowJS( audioBuffer, classificationModel, modelUrl, useGPU = true ) {
   return new Promise( async (resolve) => {
     const audioData = audioBuffer.getChannelData(0);
     let taggedPredictions;
     if( _useWorkers ) {
       const getTaggedPredictionsWorker = await spawn(new Worker("../workers/audio-classification/yamnet-worker.js"));
-      taggedPredictions = await getTaggedPredictionsWorker( Transfer(audioData.buffer), classificationModel, useGPU );
+      taggedPredictions = await getTaggedPredictionsWorker( Transfer(audioData.buffer), classificationModel, modelUrl, useGPU );
       await Thread.terminate(getTaggedPredictionsWorker);
     } else {
-      taggedPredictions = await getTaggedPredictions( audioData, classificationModel, useGPU );
+      taggedPredictions = await getTaggedPredictions( audioData, classificationModel, modelUrl, useGPU );
     }
     resolve( taggedPredictions );
 
