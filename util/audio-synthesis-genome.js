@@ -141,7 +141,10 @@ export async function getGenomeFromGenomeString( genomeString, evoParams ) {
   const waveNetwork = genome.waveNetwork;
   return { 
     id: genomePartiallyStringified._id,
-    waveNetwork, asNEATPatch 
+    waveNetwork, asNEATPatch,
+    tags: genome.tags,
+    parentGenomes: genome.parentGenomes,
+    generationNumber: genome.generationNumber
   };
 }
 
