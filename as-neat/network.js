@@ -1097,7 +1097,9 @@ Network.createFromJSON = async function(json, defaultParameters) {
     let createdNode = new Node(nodeParams);
     createdNodes.push(createdNode);
   }
-  createdNodes.push(asNEAT.globalOutNode);
+  if( ! _.find(createdNodes, {name: "OutNode"}) ) {
+    createdNodes.push(asNEAT.globalOutNode); // TOOD not unless necessary
+  }
   for( const json of obj.connections ) {
     var connectionParams = typeof json === 'string' ? JSON.parse(json) : json,
         sourceNodeId = connectionParams.sourceNode,
