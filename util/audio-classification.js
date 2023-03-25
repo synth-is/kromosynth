@@ -109,7 +109,7 @@ export async function getGenomeClassPredictions(
     asNEATPatch, waveNetwork, duration, noteDelta, velocity,
     SAMPLE_RATE, // Essentia.js input extractor sample rate:  https://mtg.github.io/essentia.js/docs/api/machinelearning_tfjs_input_extractor.js.html#line-92
     false, // reverse
-    false, // asDataArray
+    true, // asDataArray
     offlineAudioContext,
     audioContext
   ).catch( e => console.error(`Error from renderAudio called form getGenomeClassPredictions, for genomem ${genome._id}`, e ) );
@@ -118,10 +118,7 @@ export async function getGenomeClassPredictions(
     const startGenomeClassPrediction = performance.now();
     predictions = await getAudioClasses(
       audioBuffer, classificationModel, modelUrl, useGPU
-    ).catch( e => location.reload() );
-    // if( predictions === undefined ) { TODO handle in web app
-    //   location.reload();
-    // }
+    );
     const endGenomeClassPrediction = performance.now();
     console.log(`Computing class predictions for genome ${genome._id} took ${endGenomeClassPrediction-startGenomeClassPrediction} ms.`);
   }
@@ -179,7 +176,7 @@ function getAudioClassesEssentiaJSTensorFlowJS( audioBuffer, classificationModel
 
 async function getAudioClassesTensorFlowJS( audioBuffer, classificationModel, modelUrl, useGPU = true ) {
   return new Promise( async (resolve) => {
-    const audioData = audioBuffer.getChannelData(0);
+    const audioData = audioBuffer;
     let taggedPredictions;
     if( _useWorkers ) {
       const getTaggedPredictionsWorker = await spawn(new Worker("../workers/audio-classification/yamnet-worker.js"));

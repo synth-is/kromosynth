@@ -13,7 +13,7 @@ import NetworkActivationGPUWorker from "../workers/network-activation-gpu-worker
  * Activates outputs of the provided network
  */
 
-let gpu;
+// let gpu;
 
 class Activator {
 
@@ -161,7 +161,7 @@ class Activator {
         })
       );
 
-      let gpu, nodeOrder, stringFunctions;
+      let nodeOrder, stringFunctions;
       if( useGPU ) {
         const pureCPPNFunctions = memberCPPN.createPureCPPNFunctions();
         nodeOrder = pureCPPNFunctions.nodeOrder;
@@ -275,13 +275,13 @@ class Activator {
 
   /////////// GPU - begin
 
-  getGPU() {
-    if( !gpu ) {
-      gpu = new GPU();
-      addInputFunctionsToGPU( gpu );
-    }
-    return gpu;
-  }
+  // getGPU() {
+  //   if( !gpu ) {
+  //     gpu = new GPU();
+  //     addInputFunctionsToGPU( gpu );
+  //   }
+  //   return gpu;
+  // }
 
   renderOutputSignalsWithGPU(
     nodeOrder, stringFunctions, totalIn, outputIndexes,
@@ -376,8 +376,15 @@ class Activator {
           },
           output: [sampleCount]
         };
-        const oneOutputKernel = this.getGPU().createKernel(
-          new Function(activationStringForOneOutput), settings );
+
+        const gpu = new GPU();
+        addInputFunctionsToGPU( gpu );
+
+        // const oneOutputKernel = this.getGPU().createKernel(
+        //   new Function(activationStringForOneOutput), settings );
+        const oneOutputKernel = gpu.createKernel(
+          new Function(activationStringForOneOutput), settings 
+        );
 
         // promise api - is it really returning a promise?:  https://github.com/gpujs/gpu.js/blob/develop/test/src/features/promise-api.js
         activationPromises.push(

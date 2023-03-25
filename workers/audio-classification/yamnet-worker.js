@@ -48,7 +48,14 @@ export async function getTaggedPredictions( audioData, graphModel, modelUrl, use
 
     const waveform = _tf.tensor(audioData);
 
-    const [scores, embeddings, spectrogram] = model.predict(waveform);
+
+    // let model = await tf.loadGraphModel(modelUrl, { fromTFHub: false /*modelUrl === undefined*/ });
+    // let waveform = tf.tensor(audioData);
+
+    const [
+      scores
+      // , embeddings, spectrogram
+    ] = model.predict(waveform);
     const verbose = true;
     const axis = 0;
 
@@ -62,11 +69,16 @@ export async function getTaggedPredictions( audioData, graphModel, modelUrl, use
     // // Should print 494 corresponding to 'Silence' in YAMNet Class Map.
 
     const predictions = await scores.mean(axis).array();
+    // const predictions = new Array(yamnetTags.length);
+    // for (let i = 0; i < predictions.length; i++) {
+    //   predictions[i] = Math.random();
+    // }
 
     let taggedPredictions = {};
     predictions.map( (p, i) => { taggedPredictions[yamnetTags[i]] = p; return 0} );
 
     const topPredictionIdx = await scores.mean(axis).argMax().array();
+    // const topPredictionIdx = Math.floor(Math.random() * yamnetTags.length);
     const taggedTopPredictions = { [yamnetTags[topPredictionIdx]]: predictions[topPredictionIdx] };
 
     return { taggedPredictions, taggedTopPredictions };
