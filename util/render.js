@@ -184,3 +184,41 @@ export function startAudioBuffersRendering(
     useOvertoneInharmonicityFactors
   );
 }
+
+///// virtual instrument
+
+export function getBaseNoteFrequencyFromASNEATPatch( asNEATNetworkJSONString ) {
+  const synthIsPatch = patchFromAsNEATnetwork( asNEATNetworkJSONString );
+  return getBaseNoteFrequencyFromPatch( synthIsPatch );
+}
+
+// based on getBaseNoteFrequency from renderedSoundExport.jsx in the synth.is web app
+export function getBaseNoteFrequencyFromPatch( patch ) {
+  const bufferFrequencies = [];
+  patch.networkOutputs.forEach( oneNetworkOutput => {
+    let isBufferInput = false;
+    if( oneNetworkOutput.audioGraphNodes && Object.values(oneNetworkOutput.audioGraphNodes).length ) {
+      connectionParamsIteration:
+      for( let oneConnectionParams of Object.values(oneNetworkOutput.audioGraphNodes) ) {
+        if( oneConnectionParams ) {
+          for( let oneConnectionParamEntry of oneConnectionParams ) {
+            if( "buffer" === oneConnectionParamEntry.paramName ) {
+              isBufferInput = true;
+              break connectionParamsIteration;
+            }
+          }
+        }
+      }
+    }
+    if( isBufferInput ) bufferFrequencies.push( oneNetworkOutput.frequency );
+  } );
+  const baseNoteFrequency = bufferFrequencies
+    .reduce((all, one, _, src) => all += one / src.length, 0); // https://stackoverflow.com/questions/29544371/finding-the-average-of-an-array-using-js#comment100454415_29544442
+  return baseNoteFrequency;
+}
+function frequencyToNoteMark( frequency ) {
+
+}
+function getMidiNumberFromNoteMark( noteMark ) {
+
+}

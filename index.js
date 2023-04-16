@@ -8,7 +8,9 @@ export {
   renderAudioAndSpectrogram,
   wireUpAudioGraphForPatchAndWaveNetwork,
   startMemberOutputsRendering,
-  startAudioBuffersRendering
+  startAudioBuffersRendering,
+  getBaseNoteFrequencyFromPatch,
+  getBaseNoteFrequencyFromASNEATPatch
 } from "./util/render.js";
 export {
   getNewAudioSynthesisGenome,
