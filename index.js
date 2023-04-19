@@ -13,6 +13,11 @@ export {
   getBaseNoteFrequencyFromASNEATPatch
 } from "./util/render.js";
 export {
+  getOctaveMidiNumberRanges,
+  frequencyToNote,
+  getNoteMarksAndMidiNumbersArray
+} from "./util/range.js";
+export {
   getNewAudioSynthesisGenome,
   getNewAudioSynthesisGenomeByMutation,
   getGenomeFromGenomeString
