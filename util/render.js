@@ -202,7 +202,7 @@ export function getBaseNoteFrequencyFromPatch( patch ) {
       for( let oneConnectionParams of Object.values(oneNetworkOutput.audioGraphNodes) ) {
         if( oneConnectionParams ) {
           for( let oneConnectionParamEntry of oneConnectionParams ) {
-            if( "buffer" === oneConnectionParamEntry.paramName ) {
+            if( "buffer" === oneConnectionParamEntry.paramName || ("partialBuffer" === oneConnectionParamEntry.paramName && 1 === oneConnectionParamEntry.partialNumber ) ) {
               isBufferInput = true;
               break connectionParamsIteration;
             }
