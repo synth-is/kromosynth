@@ -221,7 +221,7 @@ class Activator {
               }).catch(e => {
                 console.error("Error in renderOutputSignalsWithGPU", e);
                 // reload in hopse that the GPU rendering error will be resolved by that
-                location.reload();
+                // location.reload();
               })
             );
 
@@ -383,7 +383,7 @@ class Activator {
         // const oneOutputKernel = this.getGPU().createKernel(
         //   new Function(activationStringForOneOutput), settings );
         const oneOutputKernel = gpu.createKernel(
-          new Function(activationStringForOneOutput), settings 
+          new Function(activationStringForOneOutput), settings
         );
 
         // promise api - is it really returning a promise?:  https://github.com/gpujs/gpu.js/blob/develop/test/src/features/promise-api.js
