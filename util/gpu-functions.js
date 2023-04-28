@@ -11,8 +11,8 @@ function getBias() {
 }
 function getInputSignalMain() {
  const sampleNumber = this.thread.x;
- const totalSampleCount = this.constants.totalSampleCount;
- const rangeFraction = sampleNumber / (totalSampleCount-1);
+ const _totalSampleCount = this.constants.totalSampleCount;
+ const rangeFraction = sampleNumber / (_totalSampleCount-1);
  return ((rangeFraction * 2) - 1); //* this.constants.velocity; // this.lerp( -1, 1, rangeFraction );
  // return (-1*this.constants.velocity) + rangeFraction * ( 1 - (-1*this.constants.velocity) )
 }
