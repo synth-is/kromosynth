@@ -8,13 +8,38 @@ import clone from 'clone';
 // const ActivationSubWorker = require("worker!../workers/network-activation-sub-worker.js");
 // inlining the worker seems necessary when visiting react-router path with /:parameters !?!!
 // const ActivationSubWorker = require("worker?inline!../workers/network-activation-sub-worker.js");
-import ActivationSubWorker from "./workers/network-activation-sub-worker.js?worker";
+// import ActivationSubWorker from "./workers/network-activation-sub-worker.js?worker";
 import { partial } from 'lodash-es';
 
 let activator;
 let renderer;
 
 ///// network activation
+
+/** TODO: simplify the API
+ * 
+ * @param {object} cppn 
+ * @param {object} audioGraph 
+ * @param {double} duration 
+ * @param {*} noteDelta 
+ * @param {*} velocity 
+ * @param {*} reverse 
+ * @param {*} useOvertoneInharmonicityFactors 
+ * @param {*} sampleRate 
+ * @param {*} audioContext 
+ * @param {*} useGPU 
+ */
+function getCPPNWaveformOutputs(
+  cppn, audioGraph,
+  duration, noteDelta, velocity,
+  reverse,
+  // TODO tunings
+  useOvertoneInharmonicityFactors,
+  sampleRate, audioContext,
+  useGPU
+) {
+
+}
 
 function getOutputsForMemberInCurrentPopulation(
   populationIndex, memberIndex, duration, totalSampleCount,
@@ -40,7 +65,7 @@ function getOutputsForMemberInCurrentPopulation(
       if( duration ) currentPatch.duration = duration;
 
       if( true // now we'll always want to do this, as there might be 'partialBuffer' (overtone) connections, not just when:
-        // noteDelta && noteDelta != 0 
+        // noteDelta && noteDelta != 0
       ) {
         // TODO: frequencyUpdates aren't used in getPatchWithBufferFrequenciesUpdatedAccordingToNoteDelta
         const frequencyUpdates = getBufferFrequencyUpdatesAccordingToNoteDelta(
@@ -135,59 +160,59 @@ function getOutputsForMemberInCurrentPopulation(
   });
 }
 
-function spawnMultipleNetworkActivationWebWorkers( data ) {
+// function spawnMultipleNetworkActivationWebWorkers( data ) {
 
-  const activationPromises = [];
+//   const activationPromises = [];
 
-  const samplesPerWorker = Math.round( data.totalSampleCount / numWorkers );
-  for( let i=0; i < numWorkers; i+=1 ) {
+//   const samplesPerWorker = Math.round( data.totalSampleCount / numWorkers );
+//   for( let i=0; i < numWorkers; i+=1 ) {
 
-    activationPromises.push(
-      spawnOneNetworkActivationWebWorker( data, i, samplesPerWorker, data.velocity )
-    );
-  }
+//     activationPromises.push(
+//       spawnOneNetworkActivationWebWorker( data, i, samplesPerWorker, data.velocity )
+//     );
+//   }
 
-  return Promise.all( activationPromises ).then( activationSubResults => {
+//   return Promise.all( activationPromises ).then( activationSubResults => {
 
-    const memberOutputs =
-      getCombinedMemberOutputsFromSubResults( activationSubResults );
+//     const memberOutputs =
+//       getCombinedMemberOutputsFromSubResults( activationSubResults );
 
-    return memberOutputs;
-  });
-}
+//     return memberOutputs;
+//   });
+// }
 
-function spawnOneNetworkActivationWebWorker( data, sliceIndex, samplesPerWorker, velocity ) {
+// function spawnOneNetworkActivationWebWorker( data, sliceIndex, samplesPerWorker, velocity ) {
 
-  return new Promise( (resolve, reject) => {
+//   return new Promise( (resolve, reject) => {
 
-    const sampleOffset = sliceIndex * samplesPerWorker;
-    let sampleCountToActivate;
-    if( sampleOffset + samplesPerWorker > data.totalSampleCount ) {
-      sampleCountToActivate = data.totalSampleCount - sampleOffset;
-    } else {
-      sampleCountToActivate = samplesPerWorker;
-    }
-    const activationSubWorker = new ActivationSubWorker();
-    const messageToWorker = {
-      slice: sliceIndex,  // TODO: no longer needed?
-      populationIndex: data.populationIndex,
-      memberIndex: data.memberIndex,
-      outputsToActivate: data.outputsToActivate,
-      totalSampleCount: data.totalSampleCount,
-      sampleRate: data.sampleRate,
-      member: data.member,
-      currentPatch: data.currentPatch,
-      sampleCountToActivate,
-      sampleOffset,
-      velocity
-    };
-    activationSubWorker.postMessage( messageToWorker );
-    activationSubWorker.onmessage = (e) => {
+//     const sampleOffset = sliceIndex * samplesPerWorker;
+//     let sampleCountToActivate;
+//     if( sampleOffset + samplesPerWorker > data.totalSampleCount ) {
+//       sampleCountToActivate = data.totalSampleCount - sampleOffset;
+//     } else {
+//       sampleCountToActivate = samplesPerWorker;
+//     }
+//     const activationSubWorker = new ActivationSubWorker();
+//     const messageToWorker = {
+//       slice: sliceIndex,  // TODO: no longer needed?
+//       populationIndex: data.populationIndex,
+//       memberIndex: data.memberIndex,
+//       outputsToActivate: data.outputsToActivate,
+//       totalSampleCount: data.totalSampleCount,
+//       sampleRate: data.sampleRate,
+//       member: data.member,
+//       currentPatch: data.currentPatch,
+//       sampleCountToActivate,
+//       sampleOffset,
+//       velocity
+//     };
+//     activationSubWorker.postMessage( messageToWorker );
+//     activationSubWorker.onmessage = (e) => {
 
-      resolve( e.data.memberOutputs );
-    };
-  });
-}
+//       resolve( e.data.memberOutputs );
+//     };
+//   });
+// }
 
 function getCombinedMemberOutputsFromSubResults( subResults ) {
 
@@ -358,6 +383,7 @@ function getBufferFrequencyUpdatesAccordingToNoteDelta( patch, noteDelta ) {
   return frequencyUpdates;
 }
 
+// TODO tunings
 export function getFrequencyToNoteDelta( freq, noteDelta ) {
   if( noteDelta && typeof noteDelta === 'object' && 'r1' in noteDelta && 'r2' in noteDelta ) {
     // we have multiplication coefficients for a tuning lattice, r1 and r2, so let's use those
@@ -365,12 +391,12 @@ export function getFrequencyToNoteDelta( freq, noteDelta ) {
   } else {
     // https://en.wikipedia.org/wiki/Cent_(music)#Use
     const cents = 100 * noteDelta;
-    return freq * Math.pow( 2, (cents/1200) );    
+    return freq * Math.pow( 2, (cents/1200) );
   }
 }
 
 // see comment at the inharmonicityFactor member variable in PartialNetworkOutputNode (partialNetworkOutputNode.js)
-function getOvertoneFrequency( 
+function getOvertoneFrequency(
   frequency, partialNumber, inharmonicityFactor, useOvertoneInharmonicityFactors = true
 ) {
   return frequency * partialNumber + (useOvertoneInharmonicityFactors ? frequency * inharmonicityFactor : 0);
@@ -396,7 +422,7 @@ function getAudioBuffersForMember(
 
     let patch = patchParam;
     if( true // as in getOutputsForMemberInCurrentPopulation: now we'll always want to do this, as there might be 'partialBuffer' (overtone) connections, not just when:
-      // noteDelta && noteDelta != 0 
+      // noteDelta && noteDelta != 0
     ) {
       const frequencyUpdates = getBufferFrequencyUpdatesAccordingToNoteDelta(
         patch, noteDelta );

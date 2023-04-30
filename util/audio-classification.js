@@ -120,7 +120,7 @@ export async function getGenomeClassPredictions(
       audioBuffer, classificationModel, modelUrl, useGPU
     );
     const endGenomeClassPrediction = performance.now();
-    console.log(`Computing class predictions for genome ${genome._id} took ${endGenomeClassPrediction-startGenomeClassPrediction} ms.`);
+    if(process.env.LOG_LEVEL === "debug") console.log(`Computing class predictions for genome ${genome._id} took ${endGenomeClassPrediction-startGenomeClassPrediction} ms.`);
   }
   return predictions;
 }

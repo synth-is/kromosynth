@@ -26,7 +26,8 @@ async function initializeGraphModel( graphModel, modelUrl, useGPU ) {
   if( !useGPU ) {
     _tf.setBackend('cpu');
   }
-  model = await _tf.loadGraphModel(_modelUrl, { fromTFHub: modelUrl === undefined });
+  const fromTFHub = modelUrl === undefined;
+  model = await _tf.loadGraphModel(_modelUrl, { fromTFHub });
   const endYamnetInitialization = performance.now();
   console.log(`Initialized YAMNet graph model in ${endYamnetInitialization-startYamnetInitialization} ms.`);
 }

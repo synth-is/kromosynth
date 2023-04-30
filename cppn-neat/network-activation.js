@@ -7,7 +7,7 @@ import { lerp } from '../util/range.js';
 import { randomFromInterval, halfChance } from '../util/random.js';
 import {GPU} from 'gpu.js';
 
-import NetworkActivationGPUWorker from "../workers/network-activation-gpu-worker.js?worker";
+// import NetworkActivationGPUWorker from "../workers/network-activation-gpu-worker.js?worker";
 
 /**
  * Activates outputs of the provided network
@@ -253,10 +253,12 @@ class Activator {
       }.bind(this));
 
       const networkActivationEnd = performance.now();
-      console.log(`%c Activating network,
+      if(process.env.LOG_LEVEL === "debug") {
+        console.log(`%c Activating network,
         for ${uniqueFrequencies.size} unique periods
         and ${sampleCountToActivate} samples,
         took ${networkActivationEnd - networkActivationStart}  milliseconds.`,'color:darkorange');
+      }
 
       if( outputSignalsPromises.length ) {
         Promise.all( outputSignalsPromises ).then( () => {
@@ -400,7 +402,7 @@ class Activator {
       }
 
     });
-
+/*
     if( networkActivationWorkerMessages.length ) {
       // call function to create a NetworkActivationGPUWorker,
       // post message to it and when it completes, the onmessage handler
@@ -421,7 +423,7 @@ class Activator {
         }
       };
     }
-
+*/
     return Promise.all( activationPromises ).then( outputResults => {
       for (const [resultIndex, oneOutputResult] of outputResults.entries()) { // https://flaviocopes.com/how-to-get-index-in-for-of-loop/
         // console.log("---oneOutputResult:",oneOutputResult);
