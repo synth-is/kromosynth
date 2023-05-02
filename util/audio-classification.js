@@ -2,6 +2,8 @@ import { spawn, Thread, Worker, Transfer } from "threads";
 import NodeWebAudioAPI from 'node-web-audio-api';
 const { AudioContext, OfflineAudioContext } = NodeWebAudioAPI;
 import { renderAudio } from "./render.js";
+import fs from 'fs-extra';
+import toWav from 'audiobuffer-to-wav';
 
 // import FeatureExtractionAndInferenceWorker from "../workers/audio-classification/audio-feature-extraction-and-inference-worker?worker";
 // import YamnetAudioClassificationWorker from "../workers/audio-classification/yamnet-worker.js?worker";
@@ -15,6 +17,101 @@ let _audioCtx;
 
 
 ///// classification of audio synthesis genomes
+
+// Get audio buffers for class scoring for the given genome
+export async function writeEvaluationCandidateWavFilesForGenome(
+  genome,
+  classScoringDurations = [0.5, 1, 2, 5],
+  classScoringNoteDeltas = [-36, -24, -12, 0, 12, 24, 36],
+  classScoringVelocities = [0.25, 0.5, 0.75, 1],
+  supplyAudioContextInstances,
+  evaluationCandidateWavFilesDirPath,
+  evolutionRunId, genomeId
+) {
+  const evaluationCandidateWavFileDirPaths = [];
+  const evaluationCandidateWavFilePaths = [];
+  for( let duration of classScoringDurations ) {
+    for( let noteDelta of classScoringNoteDeltas ) {
+      // TODO: choose notes within octave according to classScoringOctaveNoteCount
+      for( let velocity of classScoringVelocities ) {
+
+        let offlineAudioContext;
+        let audioContext;
+        if( supplyAudioContextInstances ) {
+          offlineAudioContext = new OfflineAudioContext({
+            numberOfChannels: 2,
+            length: SAMPLE_RATE * duration,
+            sampleRate: SAMPLE_RATE,
+          });
+          audioContext = getAudioContext();
+        } else {
+          offlineAudioContext = undefined;
+          audioContext = undefined;
+        }
+        const {asNEATPatch, waveNetwork} = genome;
+        const audioBuffer = await renderAudio(
+          asNEATPatch, waveNetwork, duration, noteDelta, velocity,
+          SAMPLE_RATE, // Essentia.js input extractor sample rate:  https://mtg.github.io/essentia.js/docs/api/machinelearning_tfjs_input_extractor.js.html#line-92
+          false, // reverse
+          false, // asDataArray
+          offlineAudioContext,
+          audioContext
+        ).catch( e => console.error(`Error from renderAudio called form getGenomeClassPredictions, for genomem ${genome._id}`, e ) );
+        if( audioBuffer ) {
+        
+          const evaluationCandidateFileName = `${evolutionRunId}_${genomeId}_${duration}_${noteDelta}_${velocity}.wav`;
+          const evaluationCandidateWavFilePath = `${evaluationCandidateWavFilesDirPath}/${evaluationCandidateFileName}`;
+
+          const wav = toWav(audioBuffer);
+          const wavBuffer = Buffer.from(new Uint8Array(wav));
+          if( !fs.existsSync(evaluationCandidateWavFilesDirPath) ) fs.mkdirSync(evaluationCandidateWavFilesDirPath);
+          fs.writeFileSync(evaluationCandidateWavFilePath, wavBuffer);
+
+          evaluationCandidateWavFilePaths.push( {
+            evaluationCandidateWavFilePath,
+            duration,
+            noteDelta,
+            velocity
+          } );
+
+        
+          evaluationCandidateWavFileDirPaths.push( evaluationCandidateWavFilePath );
+
+          // const wavBlob = new Blob([ new DataView(wav) ], {
+          //   type: 'audio/wav'
+          // });
+          // saveAs( wavBlob, `${freqIdx}_${durIdx}_${velIdx}.wav`, )
+        }
+
+      }
+    }
+  }
+  const evaluationCandidatesDirPathsJsonFileName = `${evolutionRunId}_${genomeId}_evaluation-candidate-wav-file-paths.json`;
+  const evaluationCandidatesJsonFilePath = `${evaluationCandidateWavFilesDirPath}/${evaluationCandidatesDirPathsJsonFileName}`;
+  fs.writeFileSync(evaluationCandidatesJsonFilePath, JSON.stringify(evaluationCandidateWavFilePaths));
+  return evaluationCandidatesJsonFilePath;
+}
+
+export function populateNewGenomeClassScoresInBatchIterationResultFromEvaluationCandidateWavFiles(
+  batchIterationResults,
+  classifiers,
+  evaluationCandidateWavFilesDirPath
+) {
+  batchIterationResults = getAudioClassPredictionsCombinedFromExternalClassifiers(
+    batchIterationResults,
+    classifiers
+  );
+
+  // TODO: temporary placeholder for newGenomeClassScores - replace with actual predictions
+  batchIterationResults = batchIterationResults.map( batchIterationResult => {
+    return {...batchIterationResult, newGenomeClassScores: {}} 
+  });
+
+  // delete all files from evaluationCandidateWavFilesDirPath
+  fs.emptyDirSync(evaluationCandidateWavFilesDirPath);
+
+  return batchIterationResults;
+}
 
 /**
  * For the given sound genome, obtain a map of class keys to the respective class scores 
@@ -116,7 +213,7 @@ export async function getGenomeClassPredictions(
   let predictions;
   if( audioBuffer ) {
     const startGenomeClassPrediction = performance.now();
-    predictions = await getAudioClasses(
+    predictions = await getAudioClassPredictions(
       audioBuffer, classificationModel, modelUrl, useGPU
     );
     const endGenomeClassPrediction = performance.now();
@@ -128,7 +225,7 @@ export async function getGenomeClassPredictions(
 
 ///// classification from an audio buffer according to a declared classification model
 
-async function getAudioClasses( audioBuffer, classificationModel, modelUrl, useGPU ) {
+async function getAudioClassPredictions( audioBuffer, classificationModel, modelUrl, useGPU ) {
   try {
     switch (classificationModel) {
       // case "msd-musicnn-1":
@@ -141,8 +238,27 @@ async function getAudioClasses( audioBuffer, classificationModel, modelUrl, useG
     }
   } catch (e) {
     // assuming we got here due to a GPU error, let's try to reload as a resolution:
-    location.reload();
+    // location.reload();
   }
+}
+
+function getAudioClassPredictionsCombinedFromExternalClassifiers(
+  batchIterationResults,
+  classifiers
+) {
+  for( let oneClassifier of classifiers ) {
+    switch (oneClassifier) {
+      case "yamnet-tensorflow-python":
+        // TODO call python script with batchIterationResults
+        break;
+      case "dcase-2023-task-7-tensorflow-python":
+        // TODO call python script with batchIterationResults
+        break;
+      default:
+        break;
+    }
+  }
+  return batchIterationResults;
 }
 
 /* TODO fix (ES) module format issues

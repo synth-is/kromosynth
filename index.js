@@ -31,5 +31,7 @@ export {
 // audio classification
 export {
   getClassScoresForGenome,
-  getGenomeClassPredictions
+  getGenomeClassPredictions,
+  writeEvaluationCandidateWavFilesForGenome,
+  populateNewGenomeClassScoresInBatchIterationResultFromEvaluationCandidateWavFiles
 } from "./util/audio-classification.js";

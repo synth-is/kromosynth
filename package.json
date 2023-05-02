@@ -20,9 +20,11 @@
   "dependencies": {
     "@tensorflow/tfjs": "^4.2.0",
     "@tensorflow/tfjs-node-gpu": "^4.2.0",
+    "audiobuffer-to-wav": "^1.0.0",
     "browser-or-node": "^2.1.1",
     "chroma-js": "^2.4.2",
     "clone": "^2.1.2",
+    "fs-extra": "^11.1.1",
     "gpu.js": "^2.15.2",
     "lodash-es": "^4.17.21",
     "neatjs": "^0.3.1",
