@@ -4,11 +4,11 @@ import { doesPatchNetworkHaveMinimumFitness } from './patch.js';
 import { patchFromAsNEATnetwork } from './audio-graph-asNEAT-bridge.js';
 import neatjs from 'neatjs';
 
-let evolver;
-
+// let evolver;
 function getEvolver(evoParamsWaveNetwork) {
-  if( ! evolver ) evolver = new Evolver(evoParamsWaveNetwork);
-  return evolver;
+   // if( ! evolver ) evolver = new Evolver(evoParamsWaveNetwork);
+  // return evolver;
+  return new Evolver(evoParamsWaveNetwork, false/*singleton*/);
 }
 
 // returns a new basic individual for synthesizing sound, consisting of
@@ -44,7 +44,9 @@ export async function getNewAudioSynthesisGenomeByMutation(
   ) {
     // mutate the wave network outputs
     const evoParamsWaveNetwork = getWaveNetworkParamsFromEvoParams( evoParams );
-    waveNetwork = getEvolver(evoParamsWaveNetwork).getNextCPPN_NEATgenome( [genome.waveNetwork.offspring] );
+    let evolver = getEvolver(evoParamsWaveNetwork);
+    waveNetwork = evolver.getNextCPPN_NEATgenome( [genome.waveNetwork.offspring] );
+    evolver = undefined;
   } else {
     waveNetwork = genome.waveNetwork;
   }
@@ -91,7 +93,9 @@ export async function getNewAudioSynthesisGenomeByMutation(
 
 function initializeWaveNetwork( evoParams ) {
   const evoParamsWaveNetwork = getWaveNetworkParamsFromEvoParams( evoParams );
-  let cppnNeatWaveNetwork = getEvolver(evoParamsWaveNetwork).getInitialCPPN_NEATgenome();
+  let evolver = getEvolver(evoParamsWaveNetwork);
+  let cppnNeatWaveNetwork = evolver.getInitialCPPN_NEATgenome();
+  evolver = undefined;
 
   // mutation example
   // let i, num;

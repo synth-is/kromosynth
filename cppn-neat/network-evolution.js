@@ -18,7 +18,7 @@ let instance = null;
  */
 class Evolver {
 
-  constructor( evoParams ) {
+  constructor( evoParams, singleton = true ) {
 
     setActivationFunctions( cppnjs );
 
@@ -38,10 +38,14 @@ class Evolver {
       Why: To be working with the same instance of iecGenerator,
       with the same set of population seeds.
      */
-    if( ! instance ) {
-      instance = this;
+    if( singleton ) {
+      if( ! instance ) {
+        instance = this;
+      }
+      return instance;
+    } else {
+      return this;
     }
-    return instance;
   }
 
   getInitialCPPN_NEATgenome() {
