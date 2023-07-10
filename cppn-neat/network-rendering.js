@@ -13,6 +13,7 @@ import { spawn, Thread, Worker, Transfer } from "threads";
 import {gainValuesPerAudioWave} from "../workers/gain-values-per-audio-wave-worker.js";
 import {remapControlArrayToValueCurveRange} from '../workers/remap-control-array-to-value-curve-range-worker.js';
 
+const ENVIRONMENT_IS_NODE = typeof process==="object"&&typeof process.versions==="object"&&typeof process.versions.node==="string";
 
 /**
  * Renders audio buffers from CPPN network output samples
@@ -33,7 +34,7 @@ class Renderer {
 
     return new Promise( (resolve, reject) => {
 
-      if(process.env.LOG_LEVEL === "debug") console.log('Wiring up audio graph...');
+      if( ENVIRONMENT_IS_NODE && process.env.LOG_LEVEL === "debug") console.log('Wiring up audio graph...');
       const startWiringAudioGraph = performance.now();
 
       // getSubtractiveSynthesisExampleGraph();
@@ -72,7 +73,7 @@ class Renderer {
         }
 
         const endWiringAudioGraph = performance.now();
-        if(process.env.LOG_LEVEL === "debug") console.log(`Done wiring up audio graph in ${endWiringAudioGraph-startWiringAudioGraph} ms, will now render.`);
+        if( ENVIRONMENT_IS_NODE && process.env.LOG_LEVEL === "debug") console.log(`Done wiring up audio graph in ${endWiringAudioGraph-startWiringAudioGraph} ms, will now render.`);
       });
 
     });
@@ -105,7 +106,7 @@ class Renderer {
         audioContextInstance = new AudioContext();
       }
       const endAudioCtxInstance = performance.now();
-      if(process.env.LOG_LEVEL === "debug") console.log(`%c instantiating audio context took ${endAudioCtxInstance-startAudioCtxInstance} milliseconds`,'color:darkorange');
+      if( ENVIRONMENT_IS_NODE && process.env.LOG_LEVEL === "debug") console.log(`%c instantiating audio context took ${endAudioCtxInstance-startAudioCtxInstance} milliseconds`,'color:darkorange');
 
       const sampleCount = Math.round(this.sampleRate * patch.duration);
 
@@ -166,7 +167,7 @@ class Renderer {
         // TODO: assuming virtualAudioGraph.audioContext is offline - verify?
         virtualAudioGraph.audioContext.startRendering().then(function( renderedBuffer ) {
           const endRenderAudioGraph = performance.now();
-          if(process.env.LOG_LEVEL === "debug") console.log(`%c Rendering audio graph took ${endRenderAudioGraph - startRenderAudioGraph} milliseconds`, 'color:darkorange');
+          if( ENVIRONMENT_IS_NODE && process.env.LOG_LEVEL === "debug") console.log(`%c Rendering audio graph took ${endRenderAudioGraph - startRenderAudioGraph} milliseconds`, 'color:darkorange');
 
           const networkIndividualSound = normalizeAudioBuffer( renderedBuffer, sampleCount, audioContextInstance, getDataArray );
 

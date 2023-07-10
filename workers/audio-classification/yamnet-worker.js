@@ -1,6 +1,6 @@
 import { isBrowser } from "browser-or-node";
 import * as tfBrowser from '@tensorflow/tfjs';
-import tf from '@tensorflow/tfjs-node-gpu'; // https://github.com/tensorflow/tfjs/tree/master/tfjs-node
+// import tf from '@tensorflow/tfjs-node-gpu'; // https://github.com/tensorflow/tfjs/tree/master/tfjs-node
 import { yamnetTags } from './classificationTags.js';
 
 let _tf;
@@ -38,6 +38,7 @@ export async function getTaggedPredictions( audioData, graphModel, modelUrl, use
       if( isBrowser ) {
         _tf = tfBrowser;
       } else {
+        const tf = await import('@tensorflow/tfjs-node-gpu');
         _tf = tf;
       }
     }
