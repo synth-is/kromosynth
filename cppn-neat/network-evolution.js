@@ -106,7 +106,7 @@ class Evolver {
    * create initial seed genomes for coming population(s members)
    * @return {Array} Seed genomes
    */
-  _getInitialPopulationSeeds() {
+  _getInitialPopulationSeeds( cppnOutputCount ) {
     const initialPopulationSeeds = [];
     for( let i=0; i < SEED_COUNT; i++ ) {
       //clear out genome IDs and innovation IDs
@@ -116,7 +116,7 @@ class Evolver {
 
       var neatGenome = neatjs.neatGenome.Help.CreateGenomeByInnovation(
                 INPUTS,
-                OUTPUTS,
+                cppnOutputCount || OUTPUTS,
                 {
                   connectionProportion: CONNECTION_PROPORTION,
                   connectionWeightRange: WEIGHT_RANGE
@@ -170,7 +170,8 @@ class Evolver {
       const iecOpt = evoParams["iecOptions"];
       iecOptions = {
         initialMutationCount : iecOpt.initialMutationCount,
-        postMutationCount : iecOpt.postMutationCount  // AKA mutationsOnCreation
+        postMutationCount : iecOpt.postMutationCount,  // AKA mutationsOnCreation
+        cppnOutputCount : iecOpt.cppnOutputCount
       };
     } else {
       // IEC options taken from
@@ -182,7 +183,7 @@ class Evolver {
       };
     }
 
-    const initialPopulationSeeds = this._getInitialPopulationSeeds();
+    const initialPopulationSeeds = this._getInitialPopulationSeeds( iecOptions.cppnOutputCount );
 
     return new neatjs.iec(
       np,

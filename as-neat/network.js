@@ -40,7 +40,7 @@ var Network = function(parameters) {
       {weight: this.initialOscillatorChance, element: this.addOscillator},
       {weight: this.initialAudioBufferSourceChance, element: () => {
         this.addAudioBufferSource();
-        this.addOscillator("NetworkOutputNode", true);
+        this.addOscillator("NetworkOutputNode", true, this.availableOutputIndexes);
       }}
     ];
     const initialNodeCall = Utils.weightedSelection( intialNodeCalls );
@@ -111,7 +111,9 @@ Network.prototype.defaultParameters = {
   initialOscillatorChance: 0,
   initialAudioBufferSourceChance: 1,
 
-  evolutionHistory: []
+  evolutionHistory: [],
+
+  availableOutputIndexes: undefined, // when undefined, the default array in networkOutputNode is used
 };
 /*
   Creates a deep clone of this network
@@ -150,7 +152,8 @@ Network.prototype.clone = function() {
     addAudioBufferSourceWavetableChance: _.clone(this.addAudioBufferSourceWavetableChance),
     addAudioBufferSourceAdditiveChance: _.clone(this.addAudioBufferSourceAdditiveChance),
     initialOscillatorChance: _.clone(this.initialOscillatorChance),
-    initialAudioBufferSourceChance: _.clone(this.initialAudioBufferSourceChance)
+    initialAudioBufferSourceChance: _.clone(this.initialAudioBufferSourceChance),
+    availableOutputIndexes: _.clone(this.availableOutputIndexes)
   });
 };
 /**
@@ -460,7 +463,7 @@ Network.prototype.splitMutation = async function() {
   Adds a single oscillator or networkOutput and connects it to a random input
   in one of the current nodes
  */
-Network.prototype.addOscillator = function( force, forceNodeConnection ) {
+Network.prototype.addOscillator = function( force, forceNodeConnection, availableOutputIndexes ) {
   var oscillator, possibleTargets, target, connection;
   var self = this; // TODO: this became necessary after running with Node.js (in browsers was fine  ¯\_(ツ)_/¯ )
 
@@ -506,10 +509,10 @@ Network.prototype.addOscillator = function( force, forceNodeConnection ) {
   else {
     let isPeriodicOscillator;
     if( Utils.randomChance(this.addOscillatorNetworkOutputVsOscillatorNodeRate) || "NetworkOutputNode"===force ) {
-      oscillator = NoteNetworkOutputNode.random(this.includeNoise);
+      oscillator = NoteNetworkOutputNode.random(this.includeNoise, availableOutputIndexes);
       isPeriodicOscillator = false;
     } else {
-      oscillator = NoteOscillatorNode.random();
+      oscillator = NoteOscillatorNode.random(this.includeNoise, availableOutputIndexes);
       isPeriodicOscillator = true;
     }
     // Pick a random non oscillator node
