@@ -7,6 +7,8 @@ import { lerp } from '../util/range.js';
 import { randomFromInterval, halfChance } from '../util/random.js';
 import {GPU} from 'gpu.js';
 
+const ENVIRONMENT_IS_NODE = typeof process==="object"&&typeof process.versions==="object"&&typeof process.versions.node==="string";
+
 // import NetworkActivationGPUWorker from "../workers/network-activation-gpu-worker.js?worker";
 
 /**
@@ -253,7 +255,7 @@ class Activator {
       }.bind(this));
 
       const networkActivationEnd = performance.now();
-      if(process.env.LOG_LEVEL === "debug") {
+      if(ENVIRONMENT_IS_NODE && process.env.LOG_LEVEL === "debug") {
         console.log(`%c Activating network,
         for ${uniqueFrequencies.size} unique periods
         and ${sampleCountToActivate} samples,
