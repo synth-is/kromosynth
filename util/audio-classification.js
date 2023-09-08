@@ -1,9 +1,9 @@
 import { spawn, Thread, Worker, Transfer } from "threads";
 import { renderAudio } from "./render.js";
-if( typeof window === 'undefined' ) { // Node.js
+if( typeof AudioContext === 'undefined' ) { // Node.js
   const NodeWebAudioAPI = await import('node-web-audio-api');
-  AudioContext = NodeWebAudioAPI.default.AudioContext;
-  OfflineAudioContext = NodeWebAudioAPI.default.OfflineAudioContext;
+  global.AudioContext = NodeWebAudioAPI.default.AudioContext;
+  global.OfflineAudioContext = NodeWebAudioAPI.default.OfflineAudioContext;
 }
 
 // import FeatureExtractionAndInferenceWorker from "../workers/audio-classification/audio-feature-extraction-and-inference-worker?worker";
@@ -37,7 +37,8 @@ export async function getClassScoresForGenome(
   classScoringVelocities = [0.25, 0.5, 0.75, 1],
   classificationGraphModel = 'yamnet', modelUrl,
   useGPU,
-  supplyAudioContextInstances
+  supplyAudioContextInstances,
+  useOvertoneInharmonicityFactors = true,
 ) {
   const startGenomeClassification = performance.now();
   const predictionsAggregate = {};
@@ -64,7 +65,8 @@ export async function getClassScoresForGenome(
           genome, duration, noteDelta, velocity,
           useGPU,
           offlineAudioContext,
-          audioContext
+          audioContext,
+          useOvertoneInharmonicityFactors
         );
         if( predictions ) {
           for( const classKey in predictions.taggedPredictions ) {
@@ -104,7 +106,8 @@ export async function getGenomeClassPredictions(
     genome, duration, noteDelta, velocity,
     useGPU,
     offlineAudioContext,
-    audioContext
+    audioContext,
+    useOvertoneInharmonicityFactors = true
 ) {
   const {asNEATPatch, waveNetwork} = genome;
   const audioBuffer = await renderAudio(
@@ -113,7 +116,9 @@ export async function getGenomeClassPredictions(
     false, // reverse
     true, // asDataArray
     offlineAudioContext,
-    audioContext
+    audioContext,
+    useOvertoneInharmonicityFactors,
+    useGPU
   ).catch( e => console.error(`Error from renderAudio called form getGenomeClassPredictions, for genomem ${genome._id}`, e ) );
   let predictions;
   if( audioBuffer ) {

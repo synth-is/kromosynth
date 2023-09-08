@@ -44,12 +44,12 @@ class Activator {
       return [extraInput * velocity, mainInputSignal /* * velocity*/];
     });
     const endInputSignalsCalculation = performance.now();
-    console.log(`%c InputSignalsCalculation took ${endInputSignalsCalculation - startInputSignalsCalculation} milliseconds for inputPeriods: ${inputPeriods}`,'color:orange');
+    // console.log(`%c InputSignalsCalculation took ${endInputSignalsCalculation - startInputSignalsCalculation} milliseconds for inputPeriods: ${inputPeriods}`,'color:orange');
     return inputSignals;
   }
 
   getOutputSignals( inputSignals, outputIndexes, memberCPPN ) {
-    const startOutputSignalsCalculation = performance.now();
+    // const startOutputSignalsCalculation = performance.now();
 
     const outputSignals = {};
     outputIndexes.forEach( outputIndex => {
@@ -70,13 +70,13 @@ class Activator {
         outputSignals[outputIndex][sampleIndex] = memberCPPN.getOutputSignal(outputIndex);
       });
     });
-    const endOutputSignalsCalculation = performance.now();
-    const outputSignalsCalculationTime = endOutputSignalsCalculation - startOutputSignalsCalculation
-    console.log(`%c OutputSignalsCalculation took
-      ${outputSignalsCalculationTime} milliseconds,
-      of which recursive activation took ${recursiveActivationTime},
-      ${(recursiveActivationTime/outputSignalsCalculationTime)*100}%`,
-      'color:orange');
+    // const endOutputSignalsCalculation = performance.now();
+    // const outputSignalsCalculationTime = endOutputSignalsCalculation - startOutputSignalsCalculation
+    // console.log(`%c OutputSignalsCalculation took
+    //   ${outputSignalsCalculationTime} milliseconds,
+    //   of which recursive activation took ${recursiveActivationTime},
+    //   ${(recursiveActivationTime/outputSignalsCalculationTime)*100}%`,
+    //   'color:orange');
     return outputSignals;
   }
 

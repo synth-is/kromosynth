@@ -93,7 +93,7 @@ function getOutputsForMemberInCurrentPopulation(
       const _totalSampleCount = Math.round(totalSampleCount ? totalSampleCount
                               : sampleRate * currentPatch.duration);
 
-      if( useGPU ) {
+      if( true /*useGPU*/ ) { // for now always going this route and let activator.activateMember handle the choice of CPU vs GPU; multiple workers not relevant when distributing rendering across multiple rendering node instances
 
         // keep singleton instance
         if( ! activator || activator.sampleRate !== sampleRate ) {

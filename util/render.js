@@ -12,7 +12,8 @@ export function renderAudio(
   asDataArray,
   offlineAudioContext,
   audioContext,
-  useOvertoneInharmonicityFactors
+  useOvertoneInharmonicityFactors,
+  useGPU
 ) {
   // anomaly handling
   if( Array.isArray(duration) ) duration = duration[0];
@@ -25,7 +26,8 @@ export function renderAudio(
     asDataArray,
     offlineAudioContext,
     audioContext,
-    useOvertoneInharmonicityFactors
+    useOvertoneInharmonicityFactors,
+    useGPU
   ).then( audioBufferAndCanvas => {
     return audioBufferAndCanvas.audioBuffer
   } );
@@ -37,7 +39,8 @@ export function renderAudioFromPatchAndMember(
   asDataArray,
   offlineAudioContext,
   audioContext,
-  useOvertoneInharmonicityFactors
+  useOvertoneInharmonicityFactors,
+  useGPU
 ) {
   return renderAudioAndSpectrogramFromPatchAndMember(
     synthIsPatch, waveNetwork, duration, noteDelta, velocity, sampleRate,
@@ -45,7 +48,8 @@ export function renderAudioFromPatchAndMember(
     asDataArray,
     offlineAudioContext,
     audioContext,
-    useOvertoneInharmonicityFactors
+    useOvertoneInharmonicityFactors,
+    useGPU
   ).then(audioBufferAndCanvas => {
     const {audioBuffer} = audioBufferAndCanvas;
     return audioBuffer;
@@ -58,7 +62,8 @@ export function renderAudioAndSpectrogram(
   asDataArray,
   offlineAudioContext,
   audioContext,
-  useOvertoneInharmonicityFactors
+  useOvertoneInharmonicityFactors,
+  useGPU
 ) {
   const asNEATNetworkJSONString = isString(asNEATPatch) ? asNEATPatch : asNEATPatch.toJSON();
   const synthIsPatch = patchFromAsNEATnetwork( asNEATNetworkJSONString );
@@ -69,7 +74,8 @@ export function renderAudioAndSpectrogram(
     asDataArray,
     offlineAudioContext,
     audioContext,
-    useOvertoneInharmonicityFactors
+    useOvertoneInharmonicityFactors,
+    useGPU
   );
 }
 
@@ -79,7 +85,8 @@ export function renderAudioAndSpectrogramFromPatchAndMember(
   asDataArray,
   offlineAudioContext,
   audioContext,
-  useOvertoneInharmonicityFactors
+  useOvertoneInharmonicityFactors,
+  useGPU
 ) {
   return new Promise( (resolve,reject) => {
     startMemberOutputsRendering(
@@ -89,7 +96,8 @@ export function renderAudioAndSpectrogramFromPatchAndMember(
       sampleRate,
       velocity,
       reverse,
-      useOvertoneInharmonicityFactors
+      useOvertoneInharmonicityFactors,
+      useGPU
     ).then( memberOutputs => {
       // console.log("memberOutputs",memberOutputs);
       startAudioBuffersRendering(
@@ -141,7 +149,8 @@ export function wireUpAudioGraphForPatchAndWaveNetwork(
 // similar to renderedSoundExport.js HoC in synth.is web app, but different (overloaded) methods and param ordering:
 export function startMemberOutputsRendering(
   member, patch, duration, noteDelta, sampleRate, velocity, reverse,
-  useOvertoneInharmonicityFactors
+  useOvertoneInharmonicityFactors,
+  useGPU = true
   // TODO: should we accept audioContext instead of sampleRate, which can be obtained from the former?
 ) {
   return getOutputsForMemberInCurrentPopulation(
@@ -151,7 +160,7 @@ export function startMemberOutputsRendering(
     null, // totalSampleCount
     null, //outputsToActivate,
     noteDelta,
-    true, // useGPU,
+    useGPU,
     sampleRate,
     member, patch,
     velocity,
