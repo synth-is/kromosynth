@@ -32,4 +32,5 @@ export {
 export {
   getClassScoresForGenome,
   getGenomeClassPredictions,
+  getAudioClassPredictions,
 } from "./util/audio-classification.js";

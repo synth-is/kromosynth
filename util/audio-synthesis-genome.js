@@ -39,50 +39,56 @@ export async function getNewAudioSynthesisGenomeByMutation(
   // const patchHasNetworkOutputs = genome.asNEATPatch.nodes.filter(
   //   n => n.name === "NetworkOutputNode" || n.name === "NoteNetworkOutputNode"
   // ).length > 0;
-  if( Math.random() < probabilityMutatingWaveNetwork 
-    // && patchHasNetworkOutputs 
-  ) {
-    // mutate the wave network outputs
-    const evoParamsWaveNetwork = getWaveNetworkParamsFromEvoParams( evoParams );
-    let evolver = getEvolver(evoParamsWaveNetwork);
-    waveNetwork = evolver.getNextCPPN_NEATgenome( [genome.waveNetwork.offspring] );
-    evolver = undefined;
-  } else {
-    waveNetwork = genome.waveNetwork;
-  }
-  if( Math.random() < probabilityMutatingPatch ) {
-    let patchOK;
-    let patchMutationAttempt = 0;
-    const defectivePatches = [];
-    do {
-      let patchClone = genome.asNEATPatch.clone();
-      asNEATPatch = patchClone.mutate( asNEATMutationParams );
-      let offlineAudioContext;
-      if( OfflineAudioContext ) {
-        const SAMPLE_RATE = 44100;
-        offlineAudioContext = new OfflineAudioContext({
-          numberOfChannels: 2,
-          length: SAMPLE_RATE * patchFitnessTestDuration,
-          sampleRate: SAMPLE_RATE,
-        });
-      } else {
-        offlineAudioContext = undefined;
-      }
-      patchOK = await doesPatchNetworkHaveMinimumFitness(
-        asNEATPatch, waveNetwork, 
-        audioCtx,
-        false, // checkDataAmplitude
-        offlineAudioContext,
-        patchFitnessTestDuration
-        );
-      if( ! patchOK ) {
-        defectivePatches.push( asNEATPatch );
-      }
-      patchMutationAttempt++;
-    } while( ! patchOK );
-  } else {
-    asNEATPatch = genome.asNEATPatch;
-  }
+
+  let patchOK;
+  let patchMutationAttempt = 0; // TODO: do something with this or remove
+  const defectivePatches = []; // TODO: do something with this or remove
+  do { // mutate the patch (CPPN and DSP according to mutation rates); continue doing that until it passes a health check
+
+    if( Math.random() < probabilityMutatingWaveNetwork 
+      // && patchHasNetworkOutputs 
+    ) {
+      // mutate the wave network outputs
+      const evoParamsWaveNetwork = getWaveNetworkParamsFromEvoParams( evoParams );
+      let evolver = getEvolver(evoParamsWaveNetwork);
+      waveNetwork = evolver.getNextCPPN_NEATgenome( [genome.waveNetwork.offspring] );
+      evolver = undefined;
+    } else {
+      waveNetwork = genome.waveNetwork;
+    }
+    if( Math.random() < probabilityMutatingPatch ) {
+        let patchClone = genome.asNEATPatch.clone();
+        asNEATPatch = patchClone.mutate( asNEATMutationParams );
+    } else {
+      asNEATPatch = genome.asNEATPatch;
+    }
+
+    // gene health-check
+    let offlineAudioContext;
+    if( OfflineAudioContext ) {
+      const SAMPLE_RATE = 44100;
+      offlineAudioContext = new OfflineAudioContext({
+        numberOfChannels: 2,
+        length: SAMPLE_RATE * patchFitnessTestDuration,
+        sampleRate: SAMPLE_RATE,
+      });
+    } else {
+      offlineAudioContext = undefined;
+    }
+    patchOK = await doesPatchNetworkHaveMinimumFitness(
+      asNEATPatch, waveNetwork, 
+      audioCtx,
+      false, // checkDataAmplitude
+      offlineAudioContext,
+      patchFitnessTestDuration
+      );
+    if( ! patchOK ) {
+      defectivePatches.push( asNEATPatch );
+    }
+    patchMutationAttempt++;
+
+  } while( ! patchOK );
+
   const virtualAudioGraph = patchFromAsNEATnetwork( asNEATPatch.toJSON() );
   return {
     waveNetwork, asNEATPatch, virtualAudioGraph,

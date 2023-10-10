@@ -135,7 +135,7 @@ export async function getGenomeClassPredictions(
 
 ///// classification from an audio buffer according to a declared classification model
 
-async function getAudioClassPredictions( audioBuffer, classificationModel, modelUrl, useGPU ) {
+export async function getAudioClassPredictions( audioBuffer, classificationModel, modelUrl, useGPU ) {
   try {
     switch (classificationModel) {
       // case "msd-musicnn-1":
