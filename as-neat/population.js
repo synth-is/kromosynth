@@ -28,9 +28,10 @@ Population.prototype.defaultParameters = {
   mutationParams: {
     mutationDistance: 0.5,
     // Chances must add up to 1.0
-    splitMutationChance: 0.2,
+    splitMutationChance: 0.1,
     addOscillatorChance: 0.1,
     addAudioBufferSourceChance: 0.1,
+    addPartialAndEnvelopeChance: 0.1,
     addConnectionChance: 0.2,
     mutateConnectionWeightsChance: 0.2,
     mutateNodeParametersChance: 0.2
