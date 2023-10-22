@@ -722,11 +722,11 @@ Network.prototype.addAudioBufferSource = function() {
 
 Network.prototype.addWavetableMixWaveConnection = function(targetNode) {
   // const wavetableMixWaveSourceNode = newConnection.sourceNode.clone(); // assume the source node is a *NetworkOutputNode
-  const wavetableMixWaveSourceNode = NetworkOutputNode.random(); // noise as a mix-wave makes no sense?
+  const wavetableMixWaveSourceNode = NetworkOutputNode.random( false/*includeNoise*/ ); // noise as a mix-wave makes no sense?
   this.nodes.push( wavetableMixWaveSourceNode );
-  wavetableMixWaveSourceNode.type = NetworkOutputNode.TYPES[
-    Utils.randomIndexIn(0,NetworkOutputNode.TYPES.length-3) // -3 as the noise types occupy the last three slots
-  ];
+  // wavetableMixWaveSourceNode.type = NetworkOutputNode.TYPES[
+  //   Utils.randomIndexIn(0,NetworkOutputNode.TYPES.length-3) // -3 as the noise types occupy the last three slots
+  // ];
   const targetParameter = targetNode.connectableParameters[0]; // assume we know mixWave is the first element
 // console.log("connections.push from addConnection method, waveTableMixWave");
   this.connections.push(new Connection({

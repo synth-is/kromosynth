@@ -1,5 +1,6 @@
 import { spawn, Thread, Worker, Transfer } from "threads";
 import { renderAudio } from "./render.js";
+// TODO: this doesn't work for browser deployments:
 if( typeof AudioContext === 'undefined' ) { // Node.js
   const NodeWebAudioAPI = await import('node-web-audio-api');
   global.AudioContext = NodeWebAudioAPI.default.AudioContext;
