@@ -38,6 +38,7 @@ export async function getClassScoresForGenome(
   classScoringVelocities = [0.25, 0.5, 0.75, 1],
   classificationGraphModel = 'yamnet', modelUrl,
   useGPU,
+  antiAliasing,
   supplyAudioContextInstances,
   useOvertoneInharmonicityFactors = true,
 ) {
@@ -67,7 +68,8 @@ export async function getClassScoresForGenome(
           useGPU,
           offlineAudioContext,
           audioContext,
-          useOvertoneInharmonicityFactors
+          useOvertoneInharmonicityFactors,
+          antiAliasing
         );
         if( predictions ) {
           for( const classKey in predictions.taggedPredictions ) {
@@ -108,7 +110,8 @@ export async function getGenomeClassPredictions(
     useGPU,
     offlineAudioContext,
     audioContext,
-    useOvertoneInharmonicityFactors = true
+    useOvertoneInharmonicityFactors = true,
+    antiAliasing = false
 ) {
   const {asNEATPatch, waveNetwork} = genome;
   const audioBuffer = await renderAudio(
@@ -119,7 +122,8 @@ export async function getGenomeClassPredictions(
     offlineAudioContext,
     audioContext,
     useOvertoneInharmonicityFactors,
-    useGPU
+    useGPU,
+    antiAliasing
   ).catch( e => console.error(`Error from renderAudio called form getGenomeClassPredictions, for genomem ${genome._id}`, e ) );
   let predictions;
   if( audioBuffer ) {

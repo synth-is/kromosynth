@@ -91,13 +91,26 @@ class Activator {
     reverse = false,
     variationOnPeriods = true,
     velocity = 1,
+    antiAliasing = false
   ) {
-    if( ! sampleCountToActivate ) {
+
+    let _totalSampleCount;
+    let _sampleCountToActivate;
+    if( antiAliasing ) {
+      _totalSampleCount = totalSampleCount * 2;
+      if( sampleCountToActivate ) {
+        _sampleCountToActivate = sampleCountToActivate * 2;
+      }
+    } else {
+      _totalSampleCount = totalSampleCount;
+    }
+
+    if( ! _sampleCountToActivate ) {
       // ^ optional constructor parameter,
       // to only create input signals to activate a subset
       // of the desired total sampleCount,
       // useful for multicore computation on multiple sub-web workers.
-      sampleCountToActivate = totalSampleCount;
+      _sampleCountToActivate = _totalSampleCount;
     }
     if( ! sampleOffset ) sampleOffset = 0;
 
@@ -174,13 +187,6 @@ class Activator {
       const networkActivationStart = performance.now();
       uniqueFrequencies.forEach(function( frequency ) {
 
-//         if( frequenciesUpdated[frequency] ) {
-// console.log("--setting velocity to 1");
-//           velocity = 1
-//         } else {
-// console.log("--did not set velocity to 1", velocity);
-//         }
-
           // collect output indexes associated with the input periods value being activated for
           const outputIndexs = [];
           _outputsToActivate.forEach( oneOutput => {
@@ -191,34 +197,33 @@ class Activator {
           });
 
           // console.log("---frequency:",frequency);
-          const inputPeriods = frequency * (totalSampleCount / this.sampleRate);
+          const inputPeriods = frequency * (_totalSampleCount / this.sampleRate);
           // let outputSignals;
           if( useGPU ) {
 
-            // outputSignals = this.renderOutputSignalsWithGPU(
-            //   nodeOrder,
-            //   stringFunctions,
-            //   3, // totalIn - TODO: infer from CPPN somehow?
-            //   outputIndexs,
-            //   totalSampleCount,
-            //   inputPeriods,
-            //   variationOnPeriods
-            // );
             outputSignalsPromises.push(
               this.renderOutputSignalsWithGPU(
                 nodeOrder,
                 stringFunctions,
                 3, // totalIn - TODO: infer from CPPN somehow?
                 outputIndexs,
-                totalSampleCount,
+                _totalSampleCount,
                 inputPeriods,
                 variationOnPeriods,
                 velocity
               ).then( outputSignals => {
-                outputIndexs.forEach( outputIndex => {
+                outputIndexs.forEach( async outputIndex => {
                   const memberOutputsKey = getMemberOutputsKey( {index: outputIndex, frequency} );
                   if( reverse ) outputSignals[outputIndex].reverse();
-                  memberOutputs.get( memberOutputsKey ).samples = outputSignals[outputIndex];
+                  let _samples;
+                  if( antiAliasing ) {
+                    _samples = await this.downsampleAndFilterOversampledSignal(
+                      outputSignals[outputIndex], _totalSampleCount, totalSampleCount
+                    );
+                  } else {
+                    _samples = outputSignals[outputIndex];
+                  }
+                  memberOutputs.get( memberOutputsKey ).samples = _samples;
                 });
               }).catch(e => {
                 console.error("Error in renderOutputSignalsWithGPU", e);
@@ -230,17 +235,25 @@ class Activator {
           } else {
 
             const inputSignals = this.getInputSignals(
-              totalSampleCount, sampleCountToActivate, sampleOffset,
+              _totalSampleCount, _sampleCountToActivate, sampleOffset,
               inputPeriods, variationOnPeriods,
               velocity
             );
             let outputSignals = this.getOutputSignals(
               inputSignals, outputIndexs, memberCPPN );
 
-            outputIndexs.forEach( outputIndex => {
+            outputIndexs.forEach( async outputIndex => {
               const memberOutputsKey = getMemberOutputsKey( {index: outputIndex, frequency} );
               if( reverse ) outputSignals[outputIndex].reverse();
-              memberOutputs.get( memberOutputsKey ).samples = outputSignals[outputIndex];
+              let _samples;
+              if( antiAliasing ) {
+                _samples = await this.downsampleAndFilterOversampledSignal(
+                  outputSignals[outputIndex], _totalSampleCount, totalSampleCount
+                );
+              } else {
+                _samples = outputSignals[outputIndex];
+              }   
+              memberOutputs.get( memberOutputsKey ).samples = _samples;
             });
           }
 
@@ -276,6 +289,52 @@ class Activator {
     });
   }
 
+  async downsampleAndFilterOversampledSignal(input, inputSampleRate, outputSampleRate) {
+    // Calculate the length of the output signal
+    const outputLength = Math.floor(input.length * outputSampleRate / inputSampleRate);
+    
+    // Create an offline context for the oversampled rate
+    const offlineCtxOversampled = new OfflineAudioContext(1, input.length, inputSampleRate);
+    
+    // Create a buffer source for the oversampled context
+    let inputBuffer = offlineCtxOversampled.createBuffer(1, input.length, inputSampleRate);
+    inputBuffer.copyToChannel(input, 0);
+    
+    // Create the anti-aliasing filter (lowpass filter at Nyquist frequency)
+    const nyquistFrequency = outputSampleRate / 2;
+    const filter = offlineCtxOversampled.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = nyquistFrequency;
+    
+    // Connect filter
+    const source = offlineCtxOversampled.createBufferSource();
+    source.buffer = inputBuffer;
+    source.connect(filter).connect(offlineCtxOversampled.destination);
+    source.start(0);
+  
+    // Render the buffer
+    const renderedBuffer = await offlineCtxOversampled.startRendering();
+    
+    // Create an offline context for the downsampled rate
+    const offlineCtxDownsampled = new OfflineAudioContext(1, outputLength, outputSampleRate);
+  
+    // Create a buffer source for the downsampled context
+    let outputBuffer = offlineCtxDownsampled.createBuffer(1, outputLength, outputSampleRate);
+    outputBuffer.copyToChannel(renderedBuffer.getChannelData(0), 0);
+    
+    const outputSource = offlineCtxDownsampled.createBufferSource();
+    outputSource.buffer = outputBuffer;
+    outputSource.connect(offlineCtxDownsampled.destination);
+    outputSource.start(0);
+  
+    // Render and return anti-aliased buffer
+    const downsampledRenderedBuffer = await offlineCtxDownsampled.startRendering();
+    
+    // Get Float32Array from the anti-aliased and downsampled buffer
+    const downsampledData = downsampledRenderedBuffer.getChannelData(0);
+    
+    return downsampledData;
+  }
 
   /////////// GPU - begin
 

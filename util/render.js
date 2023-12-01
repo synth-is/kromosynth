@@ -13,7 +13,8 @@ export function renderAudio(
   offlineAudioContext,
   audioContext,
   useOvertoneInharmonicityFactors,
-  useGPU
+  useGPU,
+  antiAliasing = false
 ) {
   // anomaly handling
   if( Array.isArray(duration) ) duration = duration[0];
@@ -27,7 +28,8 @@ export function renderAudio(
     offlineAudioContext,
     audioContext,
     useOvertoneInharmonicityFactors,
-    useGPU
+    useGPU,
+    antiAliasing
   ).then( audioBufferAndCanvas => {
     return audioBufferAndCanvas.audioBuffer
   } );
@@ -40,7 +42,8 @@ export function renderAudioFromPatchAndMember(
   offlineAudioContext,
   audioContext,
   useOvertoneInharmonicityFactors,
-  useGPU
+  useGPU,
+  antiAliasing = false
 ) {
   return renderAudioAndSpectrogramFromPatchAndMember(
     synthIsPatch, waveNetwork, duration, noteDelta, velocity, sampleRate,
@@ -49,7 +52,8 @@ export function renderAudioFromPatchAndMember(
     offlineAudioContext,
     audioContext,
     useOvertoneInharmonicityFactors,
-    useGPU
+    useGPU,
+    antiAliasing
   ).then(audioBufferAndCanvas => {
     const {audioBuffer} = audioBufferAndCanvas;
     return audioBuffer;
@@ -63,7 +67,8 @@ export function renderAudioAndSpectrogram(
   offlineAudioContext,
   audioContext,
   useOvertoneInharmonicityFactors,
-  useGPU
+  useGPU,
+  antiAliasing = false
 ) {
   const asNEATNetworkJSONString = isString(asNEATPatch) ? asNEATPatch : asNEATPatch.toJSON();
   const synthIsPatch = patchFromAsNEATnetwork( asNEATNetworkJSONString );
@@ -75,7 +80,8 @@ export function renderAudioAndSpectrogram(
     offlineAudioContext,
     audioContext,
     useOvertoneInharmonicityFactors,
-    useGPU
+    useGPU,
+    antiAliasing
   );
 }
 
@@ -86,7 +92,8 @@ export function renderAudioAndSpectrogramFromPatchAndMember(
   offlineAudioContext,
   audioContext,
   useOvertoneInharmonicityFactors,
-  useGPU
+  useGPU,
+  antiAliasing = false
 ) {
   return new Promise( (resolve,reject) => {
     startMemberOutputsRendering(
@@ -97,7 +104,8 @@ export function renderAudioAndSpectrogramFromPatchAndMember(
       velocity,
       reverse,
       useOvertoneInharmonicityFactors,
-      useGPU
+      useGPU,
+      antiAliasing
     ).then( memberOutputs => {
       // console.log("memberOutputs",memberOutputs);
       startAudioBuffersRendering(
@@ -117,7 +125,8 @@ export function wireUpAudioGraphForPatchAndWaveNetwork(
   genome,
   duration, noteDelta, velocity = 1, sampleRate,
   audioContextInstance,
-  reverse
+  reverse,
+  antiAliasing = false
 ) {
   const waveNetwork = genome.waveNetwork;
   let synthIsPatch;
@@ -136,7 +145,8 @@ export function wireUpAudioGraphForPatchAndWaveNetwork(
       noteDelta,
       sampleRate,
       velocity,
-      reverse
+      reverse,
+      antiAliasing
     ).then( memberOutputs => {
       wireUpAudioGraph(
         memberOutputs, synthIsPatch, duration, noteDelta, audioContextInstance
@@ -150,7 +160,8 @@ export function wireUpAudioGraphForPatchAndWaveNetwork(
 export function startMemberOutputsRendering(
   member, patch, duration, noteDelta, sampleRate, velocity, reverse,
   useOvertoneInharmonicityFactors,
-  useGPU = true
+  useGPU = true,
+  antiAliasing = false
   // TODO: should we accept audioContext instead of sampleRate, which can be obtained from the former?
 ) {
   return getOutputsForMemberInCurrentPopulation(
@@ -166,7 +177,8 @@ export function startMemberOutputsRendering(
     velocity,
     undefined, // audioCtx,
     reverse,
-    useOvertoneInharmonicityFactors
+    useOvertoneInharmonicityFactors,
+    antiAliasing
   );
 }
 

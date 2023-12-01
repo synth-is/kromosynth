@@ -50,7 +50,8 @@ function getOutputsForMemberInCurrentPopulation(
   velocity,
   audioCtx,
   reverse,
-  useOvertoneInharmonicityFactors
+  useOvertoneInharmonicityFactors,
+  antiAliasing // if true, oversample and low-pass filter
 ) {
   return new Promise( (resolve, reject) => {
 
@@ -110,7 +111,8 @@ function getOutputsForMemberInCurrentPopulation(
           useGPU,
           reverse,
           true, /* variationOnPeriods */
-          velocity
+          velocity,
+          antiAliasing
         ).then( memberOutputs => {
             resolve( memberOutputs );
           },
@@ -118,6 +120,7 @@ function getOutputsForMemberInCurrentPopulation(
         ).catch( e => {
           console.error("failed to activateMember on GPU", member);
           // TODO: encapsulate those things in functions
+          // ... TODO: no longer in use - won't be used?
           spawnMultipleNetworkActivationWebWorkers({
             populationIndex,
             memberIndex, // TOOO: handle if scratchpad member; we've already fetched the member above
