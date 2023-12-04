@@ -123,7 +123,8 @@ export async function getAudioBufferFromGenomeAndMeta(
     audioContext, // optional
     useOvertoneInharmonicityFactors,
     useGPU,
-    antiAliasing = false
+    antiAliasing = false,
+    frequencyUpdatesApplyToAllPathcNetworkOutputs = false
 ) {
     let audioBuffer;
     if( genomeAndMeta.type === "favoriteSound" ) {
@@ -137,7 +138,8 @@ export async function getAudioBufferFromGenomeAndMeta(
             audioContext,
             useOvertoneInharmonicityFactors,
             useGPU,
-            antiAliasing
+            antiAliasing,
+            frequencyUpdatesApplyToAllPathcNetworkOutputs
         );
     } else {
         let genome;
@@ -156,7 +158,8 @@ export async function getAudioBufferFromGenomeAndMeta(
             audioContext,
             useOvertoneInharmonicityFactors,
             useGPU,
-            antiAliasing
+            antiAliasing,
+            frequencyUpdatesApplyToAllPathcNetworkOutputs
         );
     }
     return audioBuffer;

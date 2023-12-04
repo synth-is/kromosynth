@@ -41,6 +41,7 @@ export async function getClassScoresForGenome(
   antiAliasing,
   supplyAudioContextInstances,
   useOvertoneInharmonicityFactors = true,
+  frequencyUpdatesApplyToAllPathcNetworkOutputs = false
 ) {
   const startGenomeClassification = performance.now();
   const predictionsAggregate = {};
@@ -69,7 +70,8 @@ export async function getClassScoresForGenome(
           offlineAudioContext,
           audioContext,
           useOvertoneInharmonicityFactors,
-          antiAliasing
+          antiAliasing,
+          frequencyUpdatesApplyToAllPathcNetworkOutputs
         );
         if( predictions ) {
           for( const classKey in predictions.taggedPredictions ) {
@@ -111,7 +113,8 @@ export async function getGenomeClassPredictions(
     offlineAudioContext,
     audioContext,
     useOvertoneInharmonicityFactors = true,
-    antiAliasing = false
+    antiAliasing = false,
+    frequencyUpdatesApplyToAllPathcNetworkOutputs = false
 ) {
   const {asNEATPatch, waveNetwork} = genome;
   const audioBuffer = await renderAudio(
@@ -123,7 +126,8 @@ export async function getGenomeClassPredictions(
     audioContext,
     useOvertoneInharmonicityFactors,
     useGPU,
-    antiAliasing
+    antiAliasing,
+    frequencyUpdatesApplyToAllPathcNetworkOutputs
   ).catch( e => console.error(`Error from renderAudio called form getGenomeClassPredictions, for genomem ${genome._id}`, e ) );
   let predictions;
   if( audioBuffer ) {

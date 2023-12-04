@@ -14,7 +14,8 @@ export function renderAudio(
   audioContext,
   useOvertoneInharmonicityFactors,
   useGPU,
-  antiAliasing = false
+  antiAliasing = false,
+  frequencyUpdatesApplyToAllPathcNetworkOutputs = false
 ) {
   // anomaly handling
   if( Array.isArray(duration) ) duration = duration[0];
@@ -29,7 +30,8 @@ export function renderAudio(
     audioContext,
     useOvertoneInharmonicityFactors,
     useGPU,
-    antiAliasing
+    antiAliasing,
+    frequencyUpdatesApplyToAllPathcNetworkOutputs
   ).then( audioBufferAndCanvas => {
     return audioBufferAndCanvas.audioBuffer
   } );
@@ -43,7 +45,8 @@ export function renderAudioFromPatchAndMember(
   audioContext,
   useOvertoneInharmonicityFactors,
   useGPU,
-  antiAliasing = false
+  antiAliasing = false,
+  frequencyUpdatesApplyToAllPathcNetworkOutputs = false
 ) {
   return renderAudioAndSpectrogramFromPatchAndMember(
     synthIsPatch, waveNetwork, duration, noteDelta, velocity, sampleRate,
@@ -53,7 +56,8 @@ export function renderAudioFromPatchAndMember(
     audioContext,
     useOvertoneInharmonicityFactors,
     useGPU,
-    antiAliasing
+    antiAliasing,
+    frequencyUpdatesApplyToAllPathcNetworkOutputs
   ).then(audioBufferAndCanvas => {
     const {audioBuffer} = audioBufferAndCanvas;
     return audioBuffer;
@@ -68,7 +72,8 @@ export function renderAudioAndSpectrogram(
   audioContext,
   useOvertoneInharmonicityFactors,
   useGPU,
-  antiAliasing = false
+  antiAliasing = false,
+  frequencyUpdatesApplyToAllPathcNetworkOutputs = false
 ) {
   const asNEATNetworkJSONString = isString(asNEATPatch) ? asNEATPatch : asNEATPatch.toJSON();
   const synthIsPatch = patchFromAsNEATnetwork( asNEATNetworkJSONString );
@@ -81,7 +86,8 @@ export function renderAudioAndSpectrogram(
     audioContext,
     useOvertoneInharmonicityFactors,
     useGPU,
-    antiAliasing
+    antiAliasing,
+    frequencyUpdatesApplyToAllPathcNetworkOutputs
   );
 }
 
@@ -93,7 +99,8 @@ export function renderAudioAndSpectrogramFromPatchAndMember(
   audioContext,
   useOvertoneInharmonicityFactors,
   useGPU,
-  antiAliasing = false
+  antiAliasing = false,
+  frequencyUpdatesApplyToAllPathcNetworkOutputs = false
 ) {
   return new Promise( (resolve,reject) => {
     startMemberOutputsRendering(
@@ -105,14 +112,16 @@ export function renderAudioAndSpectrogramFromPatchAndMember(
       reverse,
       useOvertoneInharmonicityFactors,
       useGPU,
-      antiAliasing
+      antiAliasing,
+      frequencyUpdatesApplyToAllPathcNetworkOutputs
     ).then( memberOutputs => {
       // console.log("memberOutputs",memberOutputs);
       startAudioBuffersRendering(
         memberOutputs, synthIsPatch, duration, noteDelta, sampleRate, asDataArray,
         offlineAudioContext,
         audioContext,
-        useOvertoneInharmonicityFactors
+        useOvertoneInharmonicityFactors,
+        frequencyUpdatesApplyToAllPathcNetworkOutputs
       ).then( audioBufferAndCanvas => resolve( audioBufferAndCanvas ) )
       .catch( e => reject(e) );
     }).catch( e => reject(e) );
@@ -126,7 +135,8 @@ export function wireUpAudioGraphForPatchAndWaveNetwork(
   duration, noteDelta, velocity = 1, sampleRate,
   audioContextInstance,
   reverse,
-  antiAliasing = false
+  antiAliasing = false,
+  frequencyUpdatesApplyToAllPathcNetworkOutputs = false
 ) {
   const waveNetwork = genome.waveNetwork;
   let synthIsPatch;
@@ -146,7 +156,8 @@ export function wireUpAudioGraphForPatchAndWaveNetwork(
       sampleRate,
       velocity,
       reverse,
-      antiAliasing
+      antiAliasing,
+      frequencyUpdatesApplyToAllPathcNetworkOutputs
     ).then( memberOutputs => {
       wireUpAudioGraph(
         memberOutputs, synthIsPatch, duration, noteDelta, audioContextInstance
@@ -161,7 +172,8 @@ export function startMemberOutputsRendering(
   member, patch, duration, noteDelta, sampleRate, velocity, reverse,
   useOvertoneInharmonicityFactors,
   useGPU = true,
-  antiAliasing = false
+  antiAliasing = false,
+  frequencyUpdatesApplyToAllPathcNetworkOutputs = false
   // TODO: should we accept audioContext instead of sampleRate, which can be obtained from the former?
 ) {
   return getOutputsForMemberInCurrentPopulation(
@@ -178,7 +190,8 @@ export function startMemberOutputsRendering(
     undefined, // audioCtx,
     reverse,
     useOvertoneInharmonicityFactors,
-    antiAliasing
+    antiAliasing,
+    frequencyUpdatesApplyToAllPathcNetworkOutputs
   );
 }
 
@@ -186,7 +199,8 @@ export function startAudioBuffersRendering(
   memberOutputs, patch, duration, noteDelta, sampleRate, asDataArray,
   offlineAudioContext,
   audioContext,
-  useOvertoneInharmonicityFactors
+  useOvertoneInharmonicityFactors,
+  frequencyUpdatesApplyToAllPathcNetworkOutputs = false
 ) {
   return getAudioBuffersForMember(
     memberOutputs /*existingMemberOutputs*/,
@@ -202,7 +216,8 @@ export function startAudioBuffersRendering(
     asDataArray,
     offlineAudioContext,
     audioContext,
-    useOvertoneInharmonicityFactors
+    useOvertoneInharmonicityFactors,
+    frequencyUpdatesApplyToAllPathcNetworkOutputs
   );
 }
 

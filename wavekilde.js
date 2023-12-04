@@ -51,7 +51,8 @@ function getOutputsForMemberInCurrentPopulation(
   audioCtx,
   reverse,
   useOvertoneInharmonicityFactors,
-  antiAliasing // if true, oversample and low-pass filter
+  antiAliasing, // if true, oversample and low-pass filter
+  frequencyUpdatesApplyToAllPathcNetworkOutputs = false // regardless of whether they are connected to a buffer
 ) {
   return new Promise( (resolve, reject) => {
 
@@ -68,15 +69,11 @@ function getOutputsForMemberInCurrentPopulation(
       if( true // now we'll always want to do this, as there might be 'partialBuffer' (overtone) connections, not just when:
         // noteDelta && noteDelta != 0
       ) {
-        // TODO: frequencyUpdates aren't used in getPatchWithBufferFrequenciesUpdatedAccordingToNoteDelta
-        const frequencyUpdates = getBufferFrequencyUpdatesAccordingToNoteDelta(
-          currentPatch, noteDelta );
         currentPatch = getPatchWithBufferFrequenciesUpdatedAccordingToNoteDelta(
           currentPatch,
-          frequencyUpdates,
           noteDelta,
-          useOvertoneInharmonicityFactors
-
+          useOvertoneInharmonicityFactors,
+          frequencyUpdatesApplyToAllPathcNetworkOutputs
         );
         if( outputsToActivate ) {
           outputsToActivate = getOutputsToActivateWithBufferFrequenciesUpdatedAccordingToNoteDelta(
@@ -239,14 +236,20 @@ function getCombinedMemberOutputsFromSubResults( subResults ) {
 
 function getPatchWithBufferFrequenciesUpdatedAccordingToNoteDelta(
     patch,
-    frequencyUpdates,
     noteDelta,
-    useOvertoneInharmonicityFactors
+    useOvertoneInharmonicityFactors,
+    updateAllNetworkOutputs = false, // regardless of whether they are connected to a buffer
 ) {
   const modifiedPatch = clone(patch);
 
   const networkOutputs = new Array();
 
+  let frequencyUpdates;
+  // if( updateAllNetworkOutputs ) {
+  //   frequencyUpdates = getBufferFrequencyUpdatesAccordingToNoteDelta(
+  //     patch, noteDelta 
+  //   );
+  // }
   modifiedPatch.networkOutputs.forEach( oneNetworkOutput => {
     // TODO: at some point it might be interesting to offer the option to
     // update network output frequencies for if oneConnection is to a buffer,
@@ -256,7 +259,7 @@ function getPatchWithBufferFrequenciesUpdatedAccordingToNoteDelta(
     if( true ) {
 
       let networkOutputConnectedToBuffer;
-      let networkOutputConnectedToPartialBuffer; // TODO
+      let networkOutputConnectedToPartialBuffer;
       let networkOutputConnectedToOtherParams;
       for( let oneNodeKey in oneNetworkOutput.audioGraphNodes ) {
         const oneGraphNodeConnections = oneNetworkOutput.audioGraphNodes[oneNodeKey];
@@ -331,12 +334,19 @@ function getPatchWithBufferFrequenciesUpdatedAccordingToNoteDelta(
         networkOutputs.push( networkOutputConnectedToPartialBuffer );
       }
       if( networkOutputConnectedToOtherParams ) {
-        networkOutputs.push( networkOutputConnectedToOtherParams );
+        if( updateAllNetworkOutputs ) {
+          networkOutputConnectedToOtherParams.frequency = getFrequencyToNoteDelta(
+            networkOutputConnectedToOtherParams.frequency,
+            noteDelta
+          );
+          networkOutputs.push( networkOutputConnectedToOtherParams );
+        } else {
+          networkOutputs.push( networkOutputConnectedToOtherParams );
+        }
       }
       modifiedPatch.networkOutputs = networkOutputs;
 
     } else {
-
       const originalFrequency = oneNetworkOutput.frequency;
       const newFrequency = frequencyUpdates.get(originalFrequency);
       if( newFrequency ) {
@@ -419,7 +429,8 @@ function getAudioBuffersForMember(
   getDataArray,
   offlineAudioContext,
   audioContext,
-  useOvertoneInharmonicityFactors
+  useOvertoneInharmonicityFactors,
+  frequencyUpdatesApplyToAllPathcNetworkOutputs = false
 ) {
   return new Promise( (resolve, reject) => {
 
@@ -427,13 +438,11 @@ function getAudioBuffersForMember(
     if( true // as in getOutputsForMemberInCurrentPopulation: now we'll always want to do this, as there might be 'partialBuffer' (overtone) connections, not just when:
       // noteDelta && noteDelta != 0
     ) {
-      const frequencyUpdates = getBufferFrequencyUpdatesAccordingToNoteDelta(
-        patch, noteDelta );
       patch = getPatchWithBufferFrequenciesUpdatedAccordingToNoteDelta(
         patch,
-        frequencyUpdates,
         noteDelta,
-        useOvertoneInharmonicityFactors
+        useOvertoneInharmonicityFactors,
+        frequencyUpdatesApplyToAllPathcNetworkOutputs
       );
     }
 
