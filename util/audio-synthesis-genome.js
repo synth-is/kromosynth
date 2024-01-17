@@ -25,7 +25,7 @@ export function getNewAudioSynthesisGenome(evolutionRunId, generationNumber, par
 }
 
 export async function getNewAudioSynthesisGenomeByMutation(
-    genome,
+    genomes,
     evolutionRunId, generationNumber, parentIndex, algorithm, audioCtx,
     probabilityMutatingWaveNetwork = 0.5,
     probabilityMutatingPatch = 0.5,
@@ -51,16 +51,23 @@ export async function getNewAudioSynthesisGenomeByMutation(
       // mutate the wave network outputs
       const evoParamsWaveNetwork = getWaveNetworkParamsFromEvoParams( evoParams );
       let evolver = getEvolver(evoParamsWaveNetwork);
-      waveNetwork = evolver.getNextCPPN_NEATgenome( [genome.waveNetwork.offspring] );
+      waveNetwork = evolver.getNextCPPN_NEATgenome( genomes.map( g => g.waveNetwork.offspring ) );
       evolver = undefined;
     } else {
-      waveNetwork = genome.waveNetwork;
+      waveNetwork = genomes[0].waveNetwork;
     }
     if( Math.random() < probabilityMutatingPatch ) {
-        let patchClone = genome.asNEATPatch.clone();
-        asNEATPatch = patchClone.mutate( asNEATMutationParams );
+        let patchClone = genomes[0].asNEATPatch.clone();
+        if( genomes.length > 1 ) {
+          for( let i=1; i<genomes.length; i++ ) {
+            patchClone = patchClone.crossWith( genomes[i].asNEATPatch );
+          }
+          asNEATPatch = patchClone;
+        } else {
+          asNEATPatch = patchClone.mutate( asNEATMutationParams );
+        }
     } else {
-      asNEATPatch = genome.asNEATPatch;
+      asNEATPatch = genomes[0].asNEATPatch;
     }
 
     // gene health-check
