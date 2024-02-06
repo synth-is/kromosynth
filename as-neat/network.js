@@ -280,7 +280,11 @@ Network.EvolutionTypes = EvolutionTypes;
  * @param evolutionType
  */
 Network.prototype.addToEvolutionHistory = function(evolutionType) {
+  if( this.evolutionHistory.length < 1000) { // TODO: maximum configurable?
     this.evolutionHistory.push(evolutionType);
+  } else if( this.evolutionHistory.length === 1000 ) {
+    this.evolutionHistory.push("...");
+  }
 };
 
 /**
