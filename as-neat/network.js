@@ -284,6 +284,10 @@ Network.prototype.addToEvolutionHistory = function(evolutionType) {
     this.evolutionHistory.push(evolutionType);
   } else if( this.evolutionHistory.length === 1000 ) {
     this.evolutionHistory.push("...");
+  } else if( this.evolutionHistory.length > 1000 ) {
+    this.evolutionHistory[1000] = "...";
+    // remove any elements beyond 1000
+    this.evolutionHistory.splice(1001, this.evolutionHistory.length-1001);
   }
 };
 
