@@ -60,7 +60,7 @@ export async function getNewAudioSynthesisGenomeByMutation(
         let patchClone = genomes[0].asNEATPatch.clone();
         if( genomes.length > 1 ) {
           for( let i=1; i<genomes.length; i++ ) {
-            patchClone = patchClone.crossWith( genomes[i].asNEATPatch );
+            patchClone = patchClone.crossWith( genomes[i].asNEATPatch, evoParams.audioGraph.defaultParameters );
           }
           asNEATPatch = patchClone;
         } else {

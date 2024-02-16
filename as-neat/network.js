@@ -159,7 +159,7 @@ Network.prototype.clone = function() {
 /**
   Creates a child network from this and the passed in otherNetwork
 */
-Network.prototype.crossWith = function(otherNetwork) {
+Network.prototype.crossWith = function(otherNetwork, defaultParameters) {
   var tNodes = this.nodes,
       oNodes = otherNetwork.nodes,
       tConnections = this.connections,
@@ -215,7 +215,8 @@ Network.prototype.crossWith = function(otherNetwork) {
     nodes: nodes,
     connections: connections,
     generation: Math.max(this.generation, otherNetwork.generation),
-    evolutionHistory: this.evolutionHistory.concat(otherNetwork.evolutionHistory)
+    evolutionHistory: this.evolutionHistory.concat(otherNetwork.evolutionHistory),
+    ...defaultParameters
   });
   newNetwork.lastMutation = {
     // TODO: Highlight changed objects? maybe add in blue for first parent, red for other?
