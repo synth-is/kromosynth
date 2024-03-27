@@ -1,6 +1,6 @@
 {
   "name": "kromosynth",
-  "version": "1.0.19",
+  "version": "1.0.20",
   "description": "Audio waveform breeding with neuro-evolution of pattern producing networks and quality diversity search.",
   "main": "index.js",
   "scripts": {
