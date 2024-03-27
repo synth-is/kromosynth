@@ -2,6 +2,7 @@ import Network from '../as-neat/network.js';
 import Evolver from '../cppn-neat/network-evolution.js';
 import { doesPatchNetworkHaveMinimumFitness } from './patch.js';
 import { patchFromAsNEATnetwork } from './audio-graph-asNEAT-bridge.js';
+import { getRoundedFrequencyValue } from './range.js';
 import neatjs from 'neatjs';
 
 // let evolver;
@@ -13,10 +14,27 @@ function getEvolver(evoParamsWaveNetwork) {
 
 // returns a new basic individual for synthesizing sound, consisting of
 // a wave generating network and an audio signal patch (accepting wave inputs from the network)
-export function getNewAudioSynthesisGenome(evolutionRunId, generationNumber, parentIndex, evoParams) {
-  const waveNetwork = initializeWaveNetwork( evoParams );
+export function getNewAudioSynthesisGenome(
+    evolutionRunId, generationNumber, parentIndex, evoParams,
+    oneCPPNPerFrequency = false
+  ) {
   const asNEATPatch = getInitialPatchASNEAT( evoParams );
-  const virtualAudioGraph = patchFromAsNEATnetwork( asNEATPatch.toJSON() );
+  const virtualAudioGraph = patchFromAsNEATnetwork( asNEATPatch.toJSON() ); // aka synthIsPatch
+  let waveNetwork;
+  if( oneCPPNPerFrequency ) {
+
+    // TODO add config to params for only one CPPN output
+
+    waveNetwork = { 
+      oneCPPNPerFrequency,
+      CPPNs: {}
+    };
+    initialiseCPPNForEachFrequencyIfNotExists( waveNetwork, virtualAudioGraph, evoParams );
+  } else {
+    // only one CPPN, serving all frequencies
+    waveNetwork = initializeWaveNetwork( evoParams );
+  }
+  
   return {
     waveNetwork, asNEATPatch, virtualAudioGraph,
     evolutionRunId, generationNumber, parentIndex,
@@ -42,6 +60,7 @@ export async function getNewAudioSynthesisGenomeByMutation(
 
   let patchOK;
   let patchMutationAttempt = 0; // TODO: do something with this or remove
+  const maxMutationAttempts = 100;
   const defectivePatches = []; // TODO: do something with this or remove
   do { // mutate the patch (CPPN and DSP according to mutation rates); continue doing that until it passes a health check
 
@@ -51,7 +70,25 @@ export async function getNewAudioSynthesisGenomeByMutation(
       // mutate the wave network outputs
       const evoParamsWaveNetwork = getWaveNetworkParamsFromEvoParams( evoParams );
       let evolver = getEvolver(evoParamsWaveNetwork);
-      waveNetwork = evolver.getNextCPPN_NEATgenome( genomes.map( g => g.waveNetwork.offspring ) );
+      waveNetwork = { 
+        oneCPPNPerFrequency: true,
+        CPPNs: {}
+      };
+      if( genomes[0].waveNetwork.oneCPPNPerFrequency ) {
+        // we have one CPPN per frequency
+        Object.keys( genomes[0].waveNetwork.CPPNs ).forEach( oneFrequency => {
+          // we've won the probability of mutating CPPN(s)
+          // but as we have one CPPN specialsing on each frequency, let's have another probability of mutating each:
+          // - for now just half chance - TODO: configurable?
+          if( Math.random() < 0.5 ) {
+            waveNetwork.CPPNs[oneFrequency] = evolver.getNextCPPN_NEATgenome( 
+              genomes.map( g => g.waveNetwork.CPPNs[oneFrequency].offspring )
+            );
+          }
+        });
+      } else {
+        waveNetwork = evolver.getNextCPPN_NEATgenome( genomes.map( g => g.waveNetwork.offspring ) );
+      }
       evolver = undefined;
     } else {
       waveNetwork = genomes[0].waveNetwork;
@@ -66,6 +103,12 @@ export async function getNewAudioSynthesisGenomeByMutation(
         } else {
           asNEATPatch = patchClone.mutate( asNEATMutationParams );
         }
+
+        if( genomes[0].waveNetwork.oneCPPNPerFrequency ) {
+          // let's check if there are new frequencies which don't yet have an associated / specialised CPPN
+          const virtualAudioGraph = patchFromAsNEATnetwork( asNEATPatch.toJSON() ); // aka synthIsPatch
+          initialiseCPPNForEachFrequencyIfNotExists( waveNetwork, virtualAudioGraph );
+        }
     } else {
       asNEATPatch = genomes[0].asNEATPatch;
     }
@@ -73,7 +116,7 @@ export async function getNewAudioSynthesisGenomeByMutation(
     // gene health-check
     let offlineAudioContext;
     if( OfflineAudioContext ) {
-      const SAMPLE_RATE = 44100;
+      const SAMPLE_RATE = 16000;
       offlineAudioContext = new OfflineAudioContext({
         numberOfChannels: 2,
         length: SAMPLE_RATE * patchFitnessTestDuration,
@@ -94,14 +137,40 @@ export async function getNewAudioSynthesisGenomeByMutation(
     }
     patchMutationAttempt++;
 
-  } while( ! patchOK );
+    console.log("patchMutationAttempt:",patchMutationAttempt);
 
-  const virtualAudioGraph = patchFromAsNEATnetwork( asNEATPatch.toJSON() );
-  return {
-    waveNetwork, asNEATPatch, virtualAudioGraph,
-    evolutionRunId, generationNumber, parentIndex, algorithm,
-    updated: Date.now()
-  };
+  } while( ! patchOK && patchMutationAttempt < maxMutationAttempts );
+
+  if( ! patchOK ) {
+    return undefined;
+  } else {
+    const virtualAudioGraph = patchFromAsNEATnetwork( asNEATPatch.toJSON() );
+    return {
+      waveNetwork, asNEATPatch, virtualAudioGraph,
+      evolutionRunId, generationNumber, parentIndex, algorithm,
+      updated: Date.now()
+    };
+  }
+}
+
+// for a one-CPPN-per-frequency configuration, initialise a CPPN for each, if not already present
+function initialiseCPPNForEachFrequencyIfNotExists( waveNetwork, virtualAudioGraph, evoParams ) {
+  // similar functionality in network-activation.js (getOutputsToActivateFromPatch)
+  const uniqueFrequencies = new Set(
+    virtualAudioGraph.networkOutputs
+    .filter( oneOutputConfig => {
+      // make sure "network output" is not a noise type, but rather an index to a CPPN output
+      const networkOutputIsANumber = !isNaN(oneOutputConfig.networkOutput);
+      return networkOutputIsANumber;
+    } )
+    .map( oneOutputConfig => getRoundedFrequencyValue(oneOutputConfig.frequency) )
+  );
+  uniqueFrequencies.forEach( frequency => {
+    if( ! waveNetwork.CPPNs[frequency] ) {
+      const oneCPPN = initializeWaveNetwork( evoParams );
+      waveNetwork.CPPNs[frequency] = oneCPPN;
+    }
+  });
 }
 
 function initializeWaveNetwork( evoParams ) {

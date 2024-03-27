@@ -3,7 +3,7 @@ import cppnjs from 'cppnjs';
 import { setActivationFunctions } from './activation-functions.js';
 import { getMemberOutputsKey } from '../util/network-output.js';
 import { addInputFunctionsToGPU } from '../util/gpu-functions.js';
-import { lerp } from '../util/range.js';
+import { lerp, getRoundedFrequencyValue } from '../util/range.js';
 import { randomFromInterval, halfChance } from '../util/random.js';
 import {GPU} from 'gpu.js';
 
@@ -80,6 +80,23 @@ class Activator {
     return outputSignals;
   }
 
+  getCPPNFromMember( member ) {
+    let cppn;
+    if( member.offspring.networkDecode ) {
+      cppn = member.offspring.networkDecode();
+    } else {
+      // we didn't receive member as a neatjs/cppnjs instance,
+      // but rather an object representation of it,
+      // so we'll use the data from that object to create a new instance:
+      cppn = new neatjs.neatGenome(`${Math.random()}`,
+      member.offspring.nodes,
+      member.offspring.connections,
+      member.offspring.inputNodeCount,
+      member.offspring.outputNodeCount ).networkDecode();
+    }
+    return cppn;
+  }
+
   activateMember(
     member,
     patch,
@@ -117,18 +134,9 @@ class Activator {
     return new Promise( (resolve, reject) => {
 
       let memberCPPN;
-      if( member.offspring.networkDecode ) {
-        memberCPPN = member.offspring.networkDecode();
-      } else {
-        // we didn't receive member as a neatjs/cppnjs instance,
-        // but rather an object representation of it,
-        // so we'll use the data from that object to create a new instance:
-        memberCPPN = new neatjs.neatGenome(`${Math.random()}`,
-        member.offspring.nodes,
-        member.offspring.connections,
-        member.offspring.inputNodeCount,
-        member.offspring.outputNodeCount ).networkDecode();
-      }
+      if( ! member.oneCPPNPerFrequency ) {
+        memberCPPN = this.getCPPNFromMember( member );
+      } // otherwise we'll fetch a CPPN for each unique frequency below
 
       const memberOutputs = new Map();
 
@@ -177,7 +185,7 @@ class Activator {
       );
 
       let nodeOrder, stringFunctions;
-      if( useGPU ) {
+      if( useGPU && ! member.oneCPPNPerFrequency ) {
         const pureCPPNFunctions = memberCPPN.createPureCPPNFunctions();
         nodeOrder = pureCPPNFunctions.nodeOrder;
         stringFunctions = pureCPPNFunctions.stringFunctions;
@@ -187,83 +195,101 @@ class Activator {
       const networkActivationStart = performance.now();
       uniqueFrequencies.forEach(function( frequency ) {
 
-          // collect output indexes associated with the input periods value being activated for
-          const outputIndexs = [];
-          _outputsToActivate.forEach( oneOutput => {
-            const memberOutputsKey = getMemberOutputsKey( oneOutput );
-            if( frequency == memberOutputs.get(memberOutputsKey).frequency ) {
-              outputIndexs.push( parseInt(oneOutput.index) ); // when patch comes in from asNEAT, the index is a string
-            }
-          });
+        const outputIndexs = [];
+        if( member.oneCPPNPerFrequency ) {
+          // we have one CPPN specialised on each unique frequency
+          const oneFrequencyCPPNMember = member.CPPNs[ 
+            getRoundedFrequencyValue( frequency ) 
+          ];
+          memberCPPN = this.getCPPNFromMember( oneFrequencyCPPNMember );
 
-          // console.log("---frequency:",frequency);
-          const inputPeriods = frequency * (_totalSampleCount / this.sampleRate);
-          // let outputSignals;
-          if( useGPU ) {
+          // we have CPPNs with only one output in this case
+          // TODO: no, let's for now have each per-frequency-CPPN still have 18 outputs (when coupled with a DSP; not CPPN-only)
+          // outputIndexs.push( 0 );
+        } // otherwise we have one CPPN for all frequencies
 
-            outputSignalsPromises.push(
-              this.renderOutputSignalsWithGPU(
-                nodeOrder,
-                stringFunctions,
-                3, // totalIn - TODO: infer from CPPN somehow?
-                outputIndexs,
-                _totalSampleCount,
-                inputPeriods,
-                variationOnPeriods,
-                velocity
-              ).then( outputSignals => {
-                outputIndexs.forEach( async outputIndex => {
-                  const memberOutputsKey = getMemberOutputsKey( {index: outputIndex, frequency} );
-                  if( reverse ) outputSignals[outputIndex].reverse();
-                  let _samples;
-                  if( antiAliasing ) {
-                    _samples = await this.downsampleAndFilterOversampledSignal(
-                      outputSignals[outputIndex], _totalSampleCount, totalSampleCount
-                    );
-                  } else {
-                    _samples = outputSignals[outputIndex];
-                  }
-                  memberOutputs.get( memberOutputsKey ).samples = _samples;
-                });
-              }).catch(e => {
-                console.error("Error in renderOutputSignalsWithGPU", e);
-                // reload in hopse that the GPU rendering error will be resolved by that
-                // location.reload();
-              })
-            );
+        // collect output indexes associated with the input periods value being activated for
+        _outputsToActivate.forEach( oneOutput => {
+          const memberOutputsKey = getMemberOutputsKey( oneOutput );
+          if( frequency == memberOutputs.get(memberOutputsKey).frequency ) {
+            outputIndexs.push( parseInt(oneOutput.index) ); // when patch comes in from asNEAT, the index is a string
+          }
+        });
+          
+        // console.log("---frequency:",frequency);
+        const inputPeriods = frequency * (_totalSampleCount / this.sampleRate);
+        // let outputSignals;
+        if( useGPU ) {
 
-          } else {
-
-            const inputSignals = this.getInputSignals(
-              _totalSampleCount, _sampleCountToActivate, sampleOffset,
-              inputPeriods, variationOnPeriods,
-              velocity
-            );
-            let outputSignals = this.getOutputSignals(
-              inputSignals, outputIndexs, memberCPPN );
-
-            outputIndexs.forEach( async outputIndex => {
-              const memberOutputsKey = getMemberOutputsKey( {index: outputIndex, frequency} );
-              if( reverse ) outputSignals[outputIndex].reverse();
-              let _samples;
-              if( antiAliasing ) {
-                _samples = await this.downsampleAndFilterOversampledSignal(
-                  outputSignals[outputIndex], _totalSampleCount, totalSampleCount
-                );
-              } else {
-                _samples = outputSignals[outputIndex];
-              }   
-              memberOutputs.get( memberOutputsKey ).samples = _samples;
-            });
+          if( member.oneCPPNPerFrequency ) {
+            const pureCPPNFunctions = memberCPPN.createPureCPPNFunctions();
+            nodeOrder = pureCPPNFunctions.nodeOrder;
+            stringFunctions = pureCPPNFunctions.stringFunctions;
           }
 
-          // const startApplyMemberOutputs = performance.now();
-          // outputIndexs.forEach( outputIndex => {
-          //   const memberOutputsKey = getMemberOutputsKey( {index: outputIndex, frequency} );
-          //   memberOutputs.get( memberOutputsKey ).samples = outputSignals[outputIndex];
-          // });
-          // const endApplyMemberOutputs = performance.now();
-          // console.log(`%c Applying member outputs for one input period took ${endApplyMemberOutputs - startApplyMemberOutputs} milliseconds`,'color:orange');
+          outputSignalsPromises.push(
+            this.renderOutputSignalsWithGPU(
+              nodeOrder,
+              stringFunctions,
+              3, // totalIn - TODO: infer from CPPN somehow?
+              outputIndexs,
+              _totalSampleCount,
+              inputPeriods,
+              variationOnPeriods,
+              velocity
+            ).then( outputSignals => {
+              outputIndexs.forEach( async outputIndex => {
+                const memberOutputsKey = getMemberOutputsKey( {index: outputIndex, frequency} );
+                if( reverse ) outputSignals[outputIndex].reverse();
+                let _samples;
+                if( antiAliasing ) {
+                  _samples = await this.downsampleAndFilterOversampledSignal(
+                    outputSignals[outputIndex], _totalSampleCount, totalSampleCount
+                  );
+                } else {
+                  _samples = outputSignals[outputIndex];
+                }
+                memberOutputs.get( memberOutputsKey ).samples = _samples;
+              });
+            }).catch(e => {
+              console.error("Error in renderOutputSignalsWithGPU", e);
+              // reload in hopse that the GPU rendering error will be resolved by that
+              // location.reload();
+            })
+          );
+
+        } else {
+
+          const inputSignals = this.getInputSignals(
+            _totalSampleCount, _sampleCountToActivate, sampleOffset,
+            inputPeriods, variationOnPeriods,
+            velocity
+          );
+          let outputSignals = this.getOutputSignals(
+            inputSignals, outputIndexs, memberCPPN );
+
+          outputIndexs.forEach( async outputIndex => {
+            const memberOutputsKey = getMemberOutputsKey( {index: outputIndex, frequency} );
+            if( reverse ) outputSignals[outputIndex].reverse();
+            let _samples;
+            if( antiAliasing ) {
+              _samples = await this.downsampleAndFilterOversampledSignal(
+                outputSignals[outputIndex], _totalSampleCount, totalSampleCount
+              );
+            } else {
+              _samples = outputSignals[outputIndex];
+            }   
+            memberOutputs.get( memberOutputsKey ).samples = _samples;
+          });
+        }
+
+        // const startApplyMemberOutputs = performance.now();
+        // outputIndexs.forEach( outputIndex => {
+        //   const memberOutputsKey = getMemberOutputsKey( {index: outputIndex, frequency} );
+        //   memberOutputs.get( memberOutputsKey ).samples = outputSignals[outputIndex];
+        // });
+        // const endApplyMemberOutputs = performance.now();
+        // console.log(`%c Applying member outputs for one input period took ${endApplyMemberOutputs - startApplyMemberOutputs} milliseconds`,'color:orange');
 
       }.bind(this));
 

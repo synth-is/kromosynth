@@ -223,5 +223,16 @@ export function getNoteMarksForOctave( octave ) {
   return noteMarks;
 }
 
+// get a rounded frequency value:
+// - for frequencies below 20 hz, round to the nearest integer
+// - for frequencies above 20 hz, round to the nearest 10
+export function getRoundedFrequencyValue( frequency ) {
+  if( frequency < 20 ) {
+    return Math.round(frequency);
+  } else {
+    return Math.round(frequency/10)*10;
+  }
+}
+
 // TODO: questionably the right location:
 export const numWorkers = typeof navigator !== 'undefined' ? navigator.hardwareConcurrency || 4 : 4;

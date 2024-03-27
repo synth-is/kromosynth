@@ -133,7 +133,7 @@ export const asNEATnetworkFromPatch = async patch => {
 };
 
 export const patchFromAsNEATnetwork = asNEATnetwork => {
-  asNEATnetwork = JSON.parse(asNEATnetwork);
+  if( isString(asNEATnetwork) ) asNEATnetwork = JSON.parse(asNEATnetwork);
   const { nodes, connections } = asNEATnetwork;
   const synthIsPatch = { audioGraph: {}, networkOutputs: [] };
   // console.log("---patchFromAsNEATnetwork asNEATnetwork.nodes:",asNEATnetwork.nodes);
