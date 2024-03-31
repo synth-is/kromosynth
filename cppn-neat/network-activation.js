@@ -82,7 +82,9 @@ class Activator {
 
   getCPPNFromMember( member ) {
     let cppn;
-    if( member.offspring.networkDecode ) {
+    if( member.constructor.name === 'NeatGenome' ) {
+      cppn = member.networkDecode();
+    } else if( member.offspring.networkDecode ) {
       cppn = member.offspring.networkDecode();
     } else {
       // we didn't receive member as a neatjs/cppnjs instance,

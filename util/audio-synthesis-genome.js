@@ -70,12 +70,12 @@ export async function getNewAudioSynthesisGenomeByMutation(
       // mutate the wave network outputs
       const evoParamsWaveNetwork = getWaveNetworkParamsFromEvoParams( evoParams );
       let evolver = getEvolver(evoParamsWaveNetwork);
-      waveNetwork = { 
-        oneCPPNPerFrequency: true,
-        CPPNs: {}
-      };
       if( genomes[0].waveNetwork.oneCPPNPerFrequency ) {
         // we have one CPPN per frequency
+        waveNetwork = { 
+          oneCPPNPerFrequency: true,
+          CPPNs: {}
+        };
         Object.keys( genomes[0].waveNetwork.CPPNs ).forEach( oneFrequency => {
           // we've won the probability of mutating CPPN(s)
           // but as we have one CPPN specialsing on each frequency, let's have another probability of mutating each:
@@ -216,14 +216,26 @@ export async function getGenomeFromGenomeString( genomeString, evoParams ) {
     genome.asNEATPatch,
     defaultParameters
   );
-  const neatOffspring = genome.waveNetwork.offspring;
-  genome.waveNetwork.offspring = new neatjs.neatGenome(
-    `${Math.random()}`,
-    neatOffspring.nodes,
-    neatOffspring.connections,
-    neatOffspring.inputNodeCount,
-    neatOffspring.outputNodeCount
-  );
+  if( genome.waveNetwork.oneCPPNPerFrequency ) {
+    // we have one CPPN per frequency
+    Object.keys( genome.waveNetwork.CPPNs ).forEach( oneFrequency => {
+      genome.waveNetwork.CPPNs[oneFrequency] = new neatjs.neatGenome(
+        `${Math.random()}`,
+        genome.waveNetwork.CPPNs[oneFrequency].offspring.nodes,
+        genome.waveNetwork.CPPNs[oneFrequency].offspring.connections,
+        genome.waveNetwork.CPPNs[oneFrequency].offspring.inputNodeCount,
+        genome.waveNetwork.CPPNs[oneFrequency].offspring.outputNodeCount
+      );
+    });
+  } else {
+    genome.waveNetwork.offspring = new neatjs.neatGenome(
+      `${Math.random()}`,
+      genome.waveNetwork.offspring.nodes,
+      genome.waveNetwork.offspring.connections,
+      genome.waveNetwork.offspring.inputNodeCount,
+      genome.waveNetwork.offspring.outputNodeCount
+    );
+  }
   const waveNetwork = genome.waveNetwork;
   return { 
     id: genomePartiallyStringified._id,
