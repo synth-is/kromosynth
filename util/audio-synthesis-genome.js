@@ -168,7 +168,7 @@ function initialiseCPPNForEachFrequencyIfNotExists( waveNetwork, virtualAudioGra
   for( let oneFrequency of uniqueFrequencies ) {
     if( ! waveNetwork.CPPNs[oneFrequency] ) {
       const oneCPPN = initializeWaveNetwork( evoParams );
-      waveNetwork.CPPNs[oneFrequency] = { offspring: oneCPPN };
+      waveNetwork.CPPNs[oneFrequency] = oneCPPN;
     }
   }
 }
