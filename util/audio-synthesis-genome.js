@@ -165,12 +165,12 @@ function initialiseCPPNForEachFrequencyIfNotExists( waveNetwork, virtualAudioGra
     } )
     .map( oneOutputConfig => getRoundedFrequencyValue(oneOutputConfig.frequency) )
   );
-  uniqueFrequencies.forEach( frequency => {
-    if( ! waveNetwork.CPPNs[frequency] ) {
+  for( let oneFrequency of uniqueFrequencies ) {
+    if( ! waveNetwork.CPPNs[oneFrequency] ) {
       const oneCPPN = initializeWaveNetwork( evoParams );
-      waveNetwork.CPPNs[frequency].offspring = oneCPPN;
+      waveNetwork.CPPNs[oneFrequency] = { offspring: oneCPPN };
     }
-  });
+  }
 }
 
 function initializeWaveNetwork( evoParams ) {
