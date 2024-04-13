@@ -81,7 +81,7 @@ export async function getNewAudioSynthesisGenomeByMutation(
           // but as we have one CPPN specialsing on each frequency, let's have another probability of mutating each:
           // - for now just half chance - TODO: configurable?
           if( Math.random() < 0.5 ) {
-            waveNetwork.CPPNs[oneFrequency] = evolver.getNextCPPN_NEATgenome( 
+            waveNetwork.CPPNs[oneFrequency].offspring = evolver.getNextCPPN_NEATgenome( 
               genomes.map( g => g.waveNetwork.CPPNs[oneFrequency].offspring )
             );
           }
@@ -168,7 +168,7 @@ function initialiseCPPNForEachFrequencyIfNotExists( waveNetwork, virtualAudioGra
   uniqueFrequencies.forEach( frequency => {
     if( ! waveNetwork.CPPNs[frequency] ) {
       const oneCPPN = initializeWaveNetwork( evoParams );
-      waveNetwork.CPPNs[frequency] = oneCPPN;
+      waveNetwork.CPPNs[frequency].offspring = oneCPPN;
     }
   });
 }
@@ -219,7 +219,10 @@ export async function getGenomeFromGenomeString( genomeString, evoParams ) {
   if( genome.waveNetwork.oneCPPNPerFrequency ) {
     // we have one CPPN per frequency
     Object.keys( genome.waveNetwork.CPPNs ).forEach( oneFrequency => {
-      genome.waveNetwork.CPPNs[oneFrequency] = new neatjs.neatGenome(
+      if( genome.waveNetwork.CPPNs[oneFrequency].offspring === undefined ) {
+        console.error("CPPN offspring missing for frequency", oneFrequency);
+      }
+      genome.waveNetwork.CPPNs[oneFrequency].offspring = new neatjs.neatGenome(
         `${Math.random()}`,
         genome.waveNetwork.CPPNs[oneFrequency].offspring.nodes,
         genome.waveNetwork.CPPNs[oneFrequency].offspring.connections,
