@@ -29,7 +29,8 @@ CompressorNode.prototype.defaultParameters = {
   // amount of gain reduction that the compressor is applying to the signal.
   // If fed no signal the value will be 0 (no gain reduction). The nominal range
   // is -20 to 0.
-  reduction: 0,
+  // - read only! 
+  // reduction: 0,
 
   // The amount of time (in seconds) to reduce the gain by 10dB. Its default
   // value is 0.003, with a nominal range of 0 to 1.
@@ -64,15 +65,17 @@ CompressorNode.prototype.defaultParameters = {
       mutationDeltaAllowableRange: {min: 1, max: 20},
       allowDeltaInverse: true,
       randomMutationRange: {min: 8, max: 16}
-    },{
-      name: 'reduction',
-      mutationDeltaChance: 0.8,
-      mutationDeltaInterpolationType: Utils.InterpolationType.EXPONENTIAL,
-      mutationDelta: {min: [0.01, 0.5], max: [1, 4]},
-      mutationDeltaAllowableRange: {min: -20, max: 20},
-      allowDeltaInverse: true,
-      randomMutationRange: {min: -10, max: 0}
-    },{
+    },
+    // {
+    //   name: 'reduction',
+    //   mutationDeltaChance: 0.8,
+    //   mutationDeltaInterpolationType: Utils.InterpolationType.EXPONENTIAL,
+    //   mutationDelta: {min: [0.01, 0.5], max: [1, 4]},
+    //   mutationDeltaAllowableRange: {min: -20, max: 20},
+    //   allowDeltaInverse: true,
+    //   randomMutationRange: {min: -10, max: 0}
+    // },
+    {
       name: 'attack',
       // doesn't make sense to change type by a delta
       mutationDeltaChance: 0.8,
@@ -100,7 +103,7 @@ CompressorNode.prototype.clone = function() {
     threshold: this.threshold,
     knee: this.knee,
     ratio: this.ratio,
-    reduction: this.reduction,
+    // reduction: this.reduction,
     attack: this.attack,
     release: this.release,
     mutatableParameters: _.cloneDeep(this.mutatableParameters)
@@ -121,7 +124,7 @@ function refresh(contextPair, prefix) {
   node.threshold.value = this.threshold;
   node.knee.value = this.knee;
   node.ratio.value = this.ratio;
-  node.reduction.value = this.reduction;
+  // node.reduction.value = this.reduction;
   node.attack.value = this.attack;
   node.release.value = this.release;
 
@@ -136,7 +139,7 @@ CompressorNode.prototype.getParameters = function() {
     threshold: this.threshold,
     knee: this.knee,
     ratio: this.ratio,
-    reduction: this.reduction,
+    // reduction: this.reduction,
     attack: this.attack,
     release: this.release
   };
@@ -147,7 +150,7 @@ CompressorNode.prototype.toString = function() {
     this.threshold.toFixed(2)+","+
     this.knee.toFixed(2)+","+
     this.ratio.toFixed(2)+","+
-    this.reduction.toFixed(2)+","+
+    // this.reduction.toFixed(2)+","+
     this.attack.toFixed(2)+","+
     this.release.toFixed(2)+")";
 };
@@ -156,7 +159,7 @@ CompressorNode.random = function() {
   var threshold = Utils.randomIn(-50, 10),
       knee = Utils.randomIn(20, 40),
       ratio = Utils.randomIn(8, 16),
-      reduction = Utils.randomIn(-10, 0),
+      // reduction = Utils.randomIn(-10, 0),
       attack = Utils.randomIn(0, 0.1),
       release = Utils.randomIn(0, 0.1);
 
@@ -164,7 +167,7 @@ CompressorNode.random = function() {
     threshold: threshold,
     knee: knee,
     ratio: ratio,
-    reduction: reduction,
+    // reduction: reduction,
     attack: attack,
     release: release
   });

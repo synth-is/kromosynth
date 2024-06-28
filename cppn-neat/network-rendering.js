@@ -934,6 +934,12 @@ class Renderer {
       additiveNodeDefinition.push(
         `audioWave${i}: ['bufferSource', 'gainValueCurve${i}', {buffer: ${oneAudioWaveKey}}]`
       );
+      // dummy input destination - additive synthesis node does not really have a direct input,
+      // - but rather accepts inputs via the audioWave and gainValueCurve parameters
+      // - https://github.com/synth-is/virtual-audio-graph/tree/graphs-as-arrays?tab=readme-ov-file#custom-nodes
+      // additiveNodeDefinition.push(
+      //   `dummyInput: ['gain', 'output', {gain:1}, 'input']`
+      // ); 
     }
 
     const functionBody = `

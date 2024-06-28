@@ -86,6 +86,7 @@ ns.nodeTypes = [
   'networkOutputNode',
   'noteNetworkOutputNode',
   'wavetableNode',
+  'additiveNode',
   'audioBufferSourceNode',
 
   //wave shaper node? // like distortion? eq?

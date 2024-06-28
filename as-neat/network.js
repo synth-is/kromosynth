@@ -9,6 +9,12 @@ import PartialEnvelopeNetworkOutputNode from './nodes/partialEnvelopeNetworkOutp
 import AudioBufferSourceNode from './nodes/audioBufferSourceNode.js';
 import WavetableNode from './nodes/wavetableNode.js';
 import AdditiveNode from './nodes/additiveNode.js';
+import FilterNode from './nodes/filterNode.js';
+import ConvolverNode from './nodes/convolverNode.js';
+import WaveShaperNode from './nodes/waveShaperNode.js';
+import CompressorNode from './nodes/compressorNode.js';
+import DelayNode from './nodes/delayNode.js';
+import FeedbackDelayNode from './nodes/feedbackDelayNode.js';
 import OutNode from './nodes/outNode.js';
 import GainNode from './nodes/gainNode.js';
 import Connection from './connection.js';
@@ -392,9 +398,11 @@ Network.prototype.splitMutation = async function() {
       newNode, inConnection, outConnection, targetParameter,
       targetParameterNodeName;
 
-  let NodeModule = await import('./nodes/'+selectedType+'.js');
+  let nodeModulePath = './nodes/'+selectedType+'.js';
+  console.log('splitMutation: nodeModulePath:', nodeModulePath);
+  // TODO? actually, the import needs to have been performed statically above
+  let NodeModule = await import(nodeModulePath);
   let Node = NodeModule["default"];
-
 
   // TODO: do we need this check? - it is, after all, a *split* mutation
   if( "buffer" === conn.targetParameter
@@ -413,6 +421,7 @@ Network.prototype.splitMutation = async function() {
     newNode = Node.random();
 
     if( "NetworkOutputNode"===newNode.name || "NoteNetworkOutputNode"===newNode.name
+      || "PartialNetworkOutputNode"===newNode.name || "PartialEnvelopeNetworkOutputNode"===newNode.name
       ||
       ( // TODO: same as in getPossibleNewConnections
         ("WavetableNode"===newNode.name || "AudioBufferSourceNode"===newNode.name || "AdditiveNode"===newNode.name)
@@ -425,6 +434,8 @@ Network.prototype.splitMutation = async function() {
       // can't connect to a *NetworkOutputNode, try again
       this.splitMutation(); // TODO: could this result in endless recursion?
     } else {
+
+      this.addPotentiallyRequiredWaveConnections( newNode );
 
       inConnection = new Connection({
         sourceNode: conn.sourceNode,
@@ -497,6 +508,7 @@ Network.prototype.addOscillator = function( force, forceNodeConnection, availabl
       return !connExists
              && "WavetableNode" !== node.name && "AudioBufferSourceNode" !== node.name && "AdditiveNode" !== node.name
              && "NetworkOutputNode" !== node.name && "NoteNetworkOutputNode" !== node.name
+             && "PartialNetworkOutputNode" !== node.name && "PartialEnvelopeNetworkOutputNode" !== node.name
              && node.connectableParameters
              && node.connectableParameters.length > 0;
     });
@@ -537,6 +549,7 @@ Network.prototype.addOscillator = function( force, forceNodeConnection, availabl
                && node.name !== "NoteOscillatorNode"
                && node.name !== "WavetableNode" && node.name !== "AudioBufferSourceNode" && node.name !== "AdditiveNode"
                && node.name !== "NetworkOutputNode" && node.name !== "NoteNetworkOutputNode"
+                && node.name !== "PartialNetworkOutputNode" && node.name !== "PartialEnvelopeNetworkOutputNode"
                // && node.name !== "OutNode"
          ;
       } else {
@@ -565,11 +578,8 @@ Network.prototype.addOscillator = function( force, forceNodeConnection, availabl
       if( "WavetableNode"===target.name || "AudioBufferSourceNode"===target.name ) {
         connection["targetParameter"] = "buffer";
       }
-      if( "WavetableNode"===target.name
-        && ! this.hasConnectionTargettingMixWaveParameterOfNode(target)
-      ) {
-        this.addWavetableMixWaveConnection( target );
-      }
+
+      this.addPotentiallyRequiredWaveConnections( target );
 
       log('adding audio oscillator '+oscillator.toString());
     }
@@ -673,6 +683,7 @@ Network.prototype.addAudioBufferSource = function() {
       return !connExists
             && "WavetableNode" !== node.name && "AudioBufferSourceNode" !== node.name && "AdditiveNode" !== node.name
             && "NetworkOutputNode" !== node.name && "NoteNetworkOutputNode" !== node.name
+            && "PartialNetworkOutputNode" !== node.name && "PartialEnvelopeNetworkOutputNode" !== node.name
             && node.connectableParameters
             && node.connectableParameters.length > 0;
     });
@@ -705,6 +716,7 @@ Network.prototype.addAudioBufferSource = function() {
             && node.name !== "NoteOscillatorNode"
             && node.name !== "WavetableNode" && node.name !== "AudioBufferSourceNode" && node.name !== "AdditiveNode"
             && node.name !== "NetworkOutputNode" && node.name !== "NoteNetworkOutputNode"
+            && node.name !== "PartialNetworkOutputNode" && node.name !== "PartialEnvelopeNetworkOutputNode"
             // && node.name !== "OutNode"
        ;
     });
@@ -756,6 +768,35 @@ Network.prototype.addWavetableMixWaveConnection = function(targetNode) {
   }));
 };
 
+Network.prototype.addBufferParameterConnection = function(targetNode) {
+  const bufferSourceNode = NetworkOutputNode.random( false/*includeNoise*/ ); // noise as a buffer makes no sense?
+  this.nodes.push( bufferSourceNode );
+  const targetParameter = targetNode.connectableParameters[0]; // assume we know buffer is the first element
+  this.connections.push(new Connection({
+    sourceNode: bufferSourceNode,
+    targetNode: targetNode,
+    targetParameter: targetParameter.name,
+    weight: Utils.randomIn(targetParameter.randomRange.min, targetParameter.randomRange.max),
+    mutationDelta: _.cloneDeep(targetParameter.deltaRange),
+    mutationDeltaAllowableRange: _.cloneDeep(targetParameter.mutationDeltaAllowableRange),
+    randomMutationRange: _.cloneDeep(targetParameter.randomRange)
+  }));
+};
+
+Network.prototype.addPotentiallyRequiredWaveConnections = function( targetNode ) {
+  if( "WavetableNode" === targetNode.name &&
+    ! this.hasConnectionTargettingParameterOfNode(targetNode, 'mix')
+  ) {
+    this.addWavetableMixWaveConnection( targetNode );
+  }
+  if( "ConvolverNode" === targetNode.name && 
+    ! this.hasConnectionTargettingParameterOfNode(targetNode, 'buffer')
+  ) {
+    // If no buffer is set, or if the buffer is set to null, then the ConvolverNode will effectively produce no effect; it will be equivalent to having a bypass in the audio graph.
+    this.addBufferParameterConnection( targetNode );
+  }
+}
+
 Network.prototype.addConnection = function() {
   var usingFM = Utils.randomChance(this.addConnectionFMMutationRate);
   var possibleConns = this.getPossibleNewConnections(usingFM);
@@ -774,11 +815,8 @@ Network.prototype.addConnection = function() {
   // and there is no 'mix' parameter connection present, then force the addition
   // of such a connection from a NetworkOutputNode with a random non-noise TYPE.
   this.connections.push(newConnection);
-  if( "WavetableNode" === newConnection.targetNode.name &&
-    ! this.hasConnectionTargettingMixWaveParameterOfNode(newConnection.targetNode)
-  ) {
-    this.addWavetableMixWaveConnection( newConnection.targetNode );
-  }
+  
+  this.addPotentiallyRequiredWaveConnections( newConnection.targetNode );
 
   log('new connection: '+newConnection.toString());
 
@@ -794,17 +832,17 @@ Network.prototype.addConnection = function() {
   return this;
 };
 
-Network.prototype.hasConnectionTargettingMixWaveParameterOfNode = function( targetNode ) {
-  let hasConnectionToMixWaveParameter = false;
+Network.prototype.hasConnectionTargettingParameterOfNode = function( targetNode, targetParameterName ) {
+  let hasConnectionToParameter = false;
   for( const oneConnection of this.connections ) {
     if( targetNode === oneConnection.targetNode &&
-      'mix' === oneConnection.targetParameter
+      targetParameterName === oneConnection.targetParameter
     ) {
-      hasConnectionToMixWaveParameter = true;
+      hasConnectionToParameter = true;
       break;
     }
   }
-  return hasConnectionToMixWaveParameter;
+  return hasConnectionToParameter;
 }
 
 Network.prototype.getNumberOfPartialBufferConnections = function( targetNode ) {
@@ -889,7 +927,7 @@ Network.prototype.getPossibleNewConnections = function(usingFM) {
 
       // if targetNode is WavetableNode or AudioBufferSourceNode,
       // then sourceNode can only be NetworkOutputNode or NoteNetworkOutputNode
-      if( ("WavetableNode"===targetNode.name || "AudioBufferSourceNode"===targetNode.name)
+      if( ("WavetableNode"===targetNode.name || "AudioBufferSourceNode"===targetNode.name)
         &&
         "NetworkOutputNode"!==sourceNode.name && "NoteNetworkOutputNode"!==sourceNode.name
         // TODO: restrict to NoteNetworkOutputNode ?
@@ -910,6 +948,7 @@ Network.prototype.getPossibleNewConnections = function(usingFM) {
           && (
             "NetworkOutputNode"===sourceNode.name || "NoteNetworkOutputNode"===sourceNode.name
             || "NetworkOutputNode"===conn.sourceNode.name || "NoteNetworkOutputNode"===conn.sourceNode.name
+            // TODO: also check for PartialNetworkOutputNode and PartialEnvelopeNetworkOutputNode?
           );
         });
         if( isTargetParameterOccupiedByNetworkOutput ) {
@@ -949,6 +988,40 @@ Network.prototype.getPossibleNewConnections = function(usingFM) {
         }
         connections.push(new Connection( connectionParams ));
       }
+
+      // // check if the targetNode is a ConvolverNode and if there is a connection to the buffer parameter
+      // // - and if there is a direct connection to that same node:
+      // // so check if one node has a connection (conn.targetParameter is undefined) and there is also a separate connection to the buffer parameter of that same node:
+
+      // if( "ConvolverNode"===targetNode.name ) {
+      //   const hasConnectionToBufferParameter = _.find(self.connections, function(conn) {
+      //     return targetNode.id === conn.targetNode.id && conn.targetParameter === "buffer";
+      //   });
+      //   if( hasConnectionToBufferParameter ) {
+      //     console.log("---ConvolverNode already has a connection to the buffer parameter");
+      //   }
+
+      //   // check if there is a direct connection to the same node
+      //   const hasDirectConnection = _.find(self.connections, function(conn) {
+      //     return targetNode.id === conn.targetNode.id && conn.targetParameter === null;
+      //   });
+      //   if( hasDirectConnection ) {
+      //     console.log("---ConvolverNode already has a direct connection to the same node");
+      //   }
+
+      //   if( hasConnectionToBufferParameter && hasDirectConnection ) {
+      //     console.log("---ConvolverNode already has a connection to the buffer parameter or a direct connection to the same node");
+      //   }
+
+      //   // if( !hasConnectionToBufferParameter ) {
+      //   //   connections.push(new Connection({
+      //   //     sourceNode: sourceNode,
+      //   //     targetNode: targetNode,
+      //   //     targetParameter: "buffer",
+      //   //     weight: 1.0
+      //   //   }));
+      //   // }
+      // }
     });
   });
 

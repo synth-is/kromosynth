@@ -82,6 +82,9 @@ class Activator {
 
   getCPPNFromMember( member ) {
     let cppn;
+    if( member === undefined ) {
+      throw "Member is undefined";
+    }
     if( member.constructor.name === 'NeatGenome' ) {
       cppn = member.networkDecode();
     } else if( member.offspring.networkDecode ) {

@@ -34,7 +34,7 @@ ConvolverNode.prototype.defaultParameters = {
   connectableParameters: [
     {
       name: 'buffer',
-      randomRange: {min: -1, max: 1},
+      randomRange: {min: 0, max: 1},
       // TODO: deltaRange and mutationDeltaAllowableRange doesn't seem to make sense here
       // - is it a problem to ommit those?
     }

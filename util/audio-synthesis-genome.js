@@ -60,7 +60,7 @@ export async function getNewAudioSynthesisGenomeByMutation(
 
   let patchOK;
   let patchMutationAttempt = 0; // TODO: do something with this or remove
-  const maxMutationAttempts = 100;
+  const maxMutationAttempts = 10;
   const defectivePatches = []; // TODO: do something with this or remove
   do { // mutate the patch (CPPN and DSP according to mutation rates); continue doing that until it passes a health check
 
@@ -81,9 +81,13 @@ export async function getNewAudioSynthesisGenomeByMutation(
           // but as we have one CPPN specialsing on each frequency, let's have another probability of mutating each:
           // - for now just half chance - TODO: configurable?
           if( Math.random() < 0.5 ) {
-            waveNetwork.CPPNs[oneFrequency].offspring = evolver.getNextCPPN_NEATgenome( 
+            if( waveNetwork.CPPNs[oneFrequency] === undefined ) {
+              waveNetwork.CPPNs[oneFrequency] = {};
+            }
+            const offspring = evolver.getNextCPPN_NEATgenome( 
               genomes.map( g => g.waveNetwork.CPPNs[oneFrequency].offspring )
-            );
+            ).offspring;
+            waveNetwork.CPPNs[oneFrequency].offspring = offspring;
           }
         });
       } else {
