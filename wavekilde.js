@@ -234,7 +234,7 @@ function getCombinedMemberOutputsFromSubResults( subResults ) {
   return memberOutputs;
 }
 
-function getPatchWithBufferFrequenciesUpdatedAccordingToNoteDelta(
+export function getPatchWithBufferFrequenciesUpdatedAccordingToNoteDelta(
     patch,
     noteDelta,
     useOvertoneInharmonicityFactors,

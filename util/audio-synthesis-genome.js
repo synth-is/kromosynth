@@ -3,6 +3,7 @@ import Evolver from '../cppn-neat/network-evolution.js';
 import { doesPatchNetworkHaveMinimumFitness } from './patch.js';
 import { patchFromAsNEATnetwork } from './audio-graph-asNEAT-bridge.js';
 import { getRoundedFrequencyValue } from './range.js';
+import { getPatchWithBufferFrequenciesUpdatedAccordingToNoteDelta } from '../wavekilde.js';
 import neatjs from 'neatjs';
 
 // let evolver;
@@ -116,7 +117,14 @@ export async function getNewAudioSynthesisGenomeByMutation(
             console.log("ConvolverNode detected in patch");
           }
           // let's check if there are new frequencies which don't yet have an associated / specialised CPPN
-          const virtualAudioGraph = patchFromAsNEATnetwork( asNEATPatch.toJSON() ); // aka synthIsPatch
+          let virtualAudioGraph = patchFromAsNEATnetwork( asNEATPatch.toJSON() ); // aka synthIsPatch
+          // we need to call getPatchWithBufferFrequenciesUpdatedAccordingToNoteDelta, as it's responsible for updating the frequencies for additive synthesis partials:
+          // - so we'll call it with a noteDelta of 0, as we're not interested in the noteDelta, just the frequencies
+          // - - and useOvertoneInharmonicityFactors === false and frequencyUpdatesApplyToAllPathcNetworkOutputs === false, as those are not relevant here
+          // - - - yes, yes, super messy 👍
+          virtualAudioGraph = getPatchWithBufferFrequenciesUpdatedAccordingToNoteDelta(
+            virtualAudioGraph, 0, false, false
+          );
           initialiseCPPNForEachFrequencyIfNotExists( waveNetwork, virtualAudioGraph );
         }
     } else {
