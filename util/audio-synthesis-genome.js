@@ -88,6 +88,8 @@ export async function getNewAudioSynthesisGenomeByMutation(
               genomes.map( g => g.waveNetwork.CPPNs[oneFrequency].offspring )
             ).offspring;
             waveNetwork.CPPNs[oneFrequency].offspring = offspring;
+          } else { // no mutation
+            waveNetwork.CPPNs[oneFrequency] = genomes[0].waveNetwork.CPPNs[oneFrequency];
           }
         });
       } else {
@@ -109,6 +111,10 @@ export async function getNewAudioSynthesisGenomeByMutation(
         }
 
         if( genomes[0].waveNetwork.oneCPPNPerFrequency ) {
+          const asNEATPatchString = JSON.stringify( asNEATPatch.toJSON() );
+          if( asNEATPatchString.indexOf("ConvolverNode") > -1 /*|| asNEATPatchString.indexOf("FilterNode") > -1 || asNEATPatchString.indexOf("DelayNode") > -1 */ ) {
+            console.log("ConvolverNode detected in patch");
+          }
           // let's check if there are new frequencies which don't yet have an associated / specialised CPPN
           const virtualAudioGraph = patchFromAsNEATnetwork( asNEATPatch.toJSON() ); // aka synthIsPatch
           initialiseCPPNForEachFrequencyIfNotExists( waveNetwork, virtualAudioGraph );

@@ -33,7 +33,10 @@ export function renderAudio(
     antiAliasing,
     frequencyUpdatesApplyToAllPathcNetworkOutputs
   ).then( audioBufferAndCanvas => {
-    return audioBufferAndCanvas.audioBuffer
+    if( ! audioBufferAndCanvas ) {
+      console.error("No audioBufferAndCanvas");
+    }
+    return audioBufferAndCanvas ? audioBufferAndCanvas.audioBuffer : null;
   } );
 }
 
