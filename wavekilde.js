@@ -322,6 +322,9 @@ export function getPatchWithBufferFrequenciesUpdatedAccordingToNoteDelta(
           noteDelta
         );
         if( partailBufferConnection.partialNumber > 1 ) { // non-fundamental overtone
+          if( partailBufferConnection.inharmonicityFactor !== 0 ) {
+            console.log('inharmonicityFactor:', partailBufferConnection.inharmonicityFactor);
+          }
           networkOutputConnectedToPartialBuffer.frequency = getOvertoneFrequency(
             frequencyToNoteDelta,
             partailBufferConnection.partialNumber,

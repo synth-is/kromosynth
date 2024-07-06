@@ -20,7 +20,7 @@ export function getNewAudioSynthesisGenome(
     oneCPPNPerFrequency = false
   ) {
   const asNEATPatch = getInitialPatchASNEAT( evoParams );
-  const virtualAudioGraph = patchFromAsNEATnetwork( asNEATPatch.toJSON() ); // aka synthIsPatch
+  let virtualAudioGraph = patchFromAsNEATnetwork( asNEATPatch.toJSON() ); // aka synthIsPatch
   let waveNetwork;
   if( oneCPPNPerFrequency ) {
 
@@ -30,6 +30,13 @@ export function getNewAudioSynthesisGenome(
       oneCPPNPerFrequency,
       CPPNs: {}
     };
+
+    virtualAudioGraph = getPatchWithBufferFrequenciesUpdatedAccordingToNoteDelta(
+      virtualAudioGraph, 
+      0, // noteDelta
+      true, // useOvertoneInharmonicityFactors
+      false // updateAllNetworkOutputs
+    );
     initialiseCPPNForEachFrequencyIfNotExists( waveNetwork, virtualAudioGraph, evoParams );
   } else {
     // only one CPPN, serving all frequencies
@@ -110,22 +117,12 @@ export async function getNewAudioSynthesisGenomeByMutation(
         } else {
           asNEATPatch = patchClone.mutate( asNEATMutationParams );
         }
-
         if( genomes[0].waveNetwork.oneCPPNPerFrequency ) {
-          const asNEATPatchString = JSON.stringify( asNEATPatch.toJSON() );
-          if( asNEATPatchString.indexOf("ConvolverNode") > -1 /*|| asNEATPatchString.indexOf("FilterNode") > -1 || asNEATPatchString.indexOf("DelayNode") > -1 */ ) {
-            console.log("ConvolverNode detected in patch");
-          }
-          // let's check if there are new frequencies which don't yet have an associated / specialised CPPN
+          // // let's check if there are new frequencies which don't yet have an associated / specialised CPPN
           let virtualAudioGraph = patchFromAsNEATnetwork( asNEATPatch.toJSON() ); // aka synthIsPatch
-          // we need to call getPatchWithBufferFrequenciesUpdatedAccordingToNoteDelta, as it's responsible for updating the frequencies for additive synthesis partials:
-          // - so we'll call it with a noteDelta of 0, as we're not interested in the noteDelta, just the frequencies
-          // - - and useOvertoneInharmonicityFactors === false and frequencyUpdatesApplyToAllPathcNetworkOutputs === false, as those are not relevant here
-          // - - - yes, yes, super messy 👍
-          virtualAudioGraph = getPatchWithBufferFrequenciesUpdatedAccordingToNoteDelta(
-            virtualAudioGraph, 0, false, false
-          );
-          initialiseCPPNForEachFrequencyIfNotExists( waveNetwork, virtualAudioGraph );
+          initialiseCPPNForEachFrequencyIfNotExists( waveNetwork, virtualAudioGraph, evoParams );
+          // TODO for some reason, it doesn't suffice to initialise the CPPN for each frequency here, 
+          // - se we'll do it below again, for unknown reasons!
         }
     } else {
       asNEATPatch = genomes[0].asNEATPatch;
@@ -162,7 +159,11 @@ export async function getNewAudioSynthesisGenomeByMutation(
   if( ! patchOK ) {
     return undefined;
   } else {
-    const virtualAudioGraph = patchFromAsNEATnetwork( asNEATPatch.toJSON() );
+    
+    let virtualAudioGraph = patchFromAsNEATnetwork( asNEATPatch.toJSON() );
+    // this call above should suffice, but for some reason it doesn't, so we'll do it here again:
+    initialiseCPPNForEachFrequencyIfNotExists( waveNetwork, virtualAudioGraph, evoParams );
+    
     return {
       waveNetwork, asNEATPatch, virtualAudioGraph,
       evolutionRunId, generationNumber, parentIndex, algorithm,
@@ -174,8 +175,17 @@ export async function getNewAudioSynthesisGenomeByMutation(
 // for a one-CPPN-per-frequency configuration, initialise a CPPN for each, if not already present
 function initialiseCPPNForEachFrequencyIfNotExists( waveNetwork, virtualAudioGraph, evoParams ) {
   // similar functionality in network-activation.js (getOutputsToActivateFromPatch)
+
+  // we need to call getPatchWithBufferFrequenciesUpdatedAccordingToNoteDelta, as it's responsible for updating the frequencies for additive synthesis partials
+  // TODO this may all be refactored to be more clear
+  const updatedVirtualAudioGraph = getPatchWithBufferFrequenciesUpdatedAccordingToNoteDelta(
+    virtualAudioGraph, 
+    0, 
+    true, // useOvertoneInharmonicityFactors 
+    false // updateAllNetworkOutputs
+  );
   const uniqueFrequencies = new Set(
-    virtualAudioGraph.networkOutputs
+    updatedVirtualAudioGraph.networkOutputs
     .filter( oneOutputConfig => {
       // make sure "network output" is not a noise type, but rather an index to a CPPN output
       const networkOutputIsANumber = !isNaN(oneOutputConfig.networkOutput);
