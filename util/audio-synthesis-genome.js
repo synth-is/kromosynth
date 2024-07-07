@@ -162,7 +162,9 @@ export async function getNewAudioSynthesisGenomeByMutation(
     
     let virtualAudioGraph = patchFromAsNEATnetwork( asNEATPatch.toJSON() );
     // this call above should suffice, but for some reason it doesn't, so we'll do it here again:
-    initialiseCPPNForEachFrequencyIfNotExists( waveNetwork, virtualAudioGraph, evoParams );
+    if( genomes[0].waveNetwork.oneCPPNPerFrequency ) {
+      initialiseCPPNForEachFrequencyIfNotExists( waveNetwork, virtualAudioGraph, evoParams );
+    }
     
     return {
       waveNetwork, asNEATPatch, virtualAudioGraph,
