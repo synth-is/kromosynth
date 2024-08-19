@@ -34,3 +34,11 @@ export {
   getGenomeClassPredictions,
   getAudioClassPredictions,
 } from "./util/audio-classification.js";
+
+export {
+  patchFromAsNEATnetwork,
+} from "./util/audio-graph-asNEAT-bridge.js";
+
+export {
+  getRoundedFrequencyValue,
+} from "./util/range.js";

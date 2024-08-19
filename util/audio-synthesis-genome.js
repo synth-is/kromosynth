@@ -93,7 +93,12 @@ export async function getNewAudioSynthesisGenomeByMutation(
               waveNetwork.CPPNs[oneFrequency] = {};
             }
             const offspring = evolver.getNextCPPN_NEATgenome( 
-              genomes.map( g => g.waveNetwork.CPPNs[oneFrequency].offspring )
+              genomes.map( g => {
+                // find the CPPN with a frequency key closets to oneFrequency
+                const frequencyKeys = Object.keys( g.waveNetwork.CPPNs );
+                const closestFrequency = frequencyKeys.reduce( (prev, curr) => Math.abs(curr - oneFrequency) < Math.abs(prev - oneFrequency) ? curr : prev );
+                return g.waveNetwork.CPPNs[closestFrequency].offspring;
+              } )
             ).offspring;
             waveNetwork.CPPNs[oneFrequency].offspring = offspring;
           } else { // no mutation
