@@ -119,14 +119,21 @@ export function renderAudioAndSpectrogramFromPatchAndMember(
       frequencyUpdatesApplyToAllPathcNetworkOutputs
     ).then( memberOutputs => {
       // console.log("memberOutputs",memberOutputs);
-      startAudioBuffersRendering(
-        memberOutputs, synthIsPatch, duration, noteDelta, sampleRate, asDataArray,
-        offlineAudioContext,
-        audioContext,
-        useOvertoneInharmonicityFactors,
-        frequencyUpdatesApplyToAllPathcNetworkOutputs
-      ).then( audioBufferAndCanvas => resolve( audioBufferAndCanvas ) )
-      .catch( e => reject(e) );
+      try {
+        startAudioBuffersRendering(
+          memberOutputs, synthIsPatch, duration, noteDelta, sampleRate, asDataArray,
+          offlineAudioContext,
+          audioContext,
+          useOvertoneInharmonicityFactors,
+          frequencyUpdatesApplyToAllPathcNetworkOutputs
+        ).then( audioBufferAndCanvas => {
+          return resolve( audioBufferAndCanvas )
+        } )
+        .catch( e => reject(e) );
+      } finally {
+        memberOutputs.clear();
+        memberOutputs = null;
+      }
     }).catch( e => reject(e) );
   }).catch( async e => {
     console.error(e); // TODO: error creating virtual audio graph here

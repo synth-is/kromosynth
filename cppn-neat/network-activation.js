@@ -52,13 +52,17 @@ class Activator {
     // const startOutputSignalsCalculation = performance.now();
 
     const outputSignals = {};
-    outputIndexes.forEach( outputIndex => {
+    // outputIndexes.forEach( outputIndex => {
+    for( let outputIndex of outputIndexes ) {
       // typed array for samples; results in faster transfers via message passing from worker
       outputSignals[outputIndex] = new Float32Array( inputSignals.length );
-    });
+    } //);
 
     let recursiveActivationTime = 0;
-    inputSignals.forEach( (signalSet, sampleIndex) => {
+    // inputSignals.forEach( (signalSet, sampleIndex) => {
+    for( let sampleIndex = 0; sampleIndex < inputSignals.length; sampleIndex++ ) {
+      const signalSet = inputSignals[sampleIndex];
+
       memberCPPN.clearSignals();
       memberCPPN.setInputSignals( signalSet );
       const startRecursiveActivation = performance.now();
@@ -66,10 +70,11 @@ class Activator {
       const endRecursiveActivation = performance.now();
       recursiveActivationTime += endRecursiveActivation - startRecursiveActivation;
 
-      outputIndexes.forEach( outputIndex => {
+      // outputIndexes.forEach( outputIndex => {
+      for( let outputIndex of outputIndexes ) {
         outputSignals[outputIndex][sampleIndex] = memberCPPN.getOutputSignal(outputIndex);
-      });
-    });
+      } //);
+    } //);
     // const endOutputSignalsCalculation = performance.now();
     // const outputSignalsCalculationTime = endOutputSignalsCalculation - startOutputSignalsCalculation
     // console.log(`%c OutputSignalsCalculation took
@@ -136,14 +141,14 @@ class Activator {
     }
     if( ! sampleOffset ) sampleOffset = 0;
 
-    return new Promise( (resolve, reject) => {
+    return new Promise( async (resolve, reject) => {
 
       let memberCPPN;
       if( ! member.oneCPPNPerFrequency ) {
         memberCPPN = this.getCPPNFromMember( member );
       } // otherwise we'll fetch a CPPN for each unique frequency below
 
-      const memberOutputs = new Map();
+      let memberOutputs = new Map();
 
       let _outputsToActivate;
       if( outputsToActivate ) {
@@ -170,7 +175,8 @@ class Activator {
       // console.log("---_outputsToActivate:",_outputsToActivate);
       // const frequenciesUpdated = {};
 
-      _outputsToActivate.forEach( function(oneOutput) {
+      // _outputsToActivate.forEach( function(oneOutput) {
+      for( let oneOutput of _outputsToActivate ) {
         const memberOutputsKey = getMemberOutputsKey( oneOutput );
         memberOutputs.set( memberOutputsKey, {
           samples: undefined,
@@ -180,7 +186,7 @@ class Activator {
         // if( oneOutput.frequencyUpdated ) {
         //   frequenciesUpdated[oneOutput.frequency] = true;
         // }
-      }.bind(this));
+      } //.bind(this));
 
       // let's only activate the network once per unique input periods value / sample
       let uniqueFrequencies = new Set( _outputsToActivate.map( o => {
@@ -198,7 +204,8 @@ class Activator {
 
       const outputSignalsPromises = [];
       const networkActivationStart = performance.now();
-      uniqueFrequencies.forEach(function( frequency ) {
+      // uniqueFrequencies.forEach(function( frequency ) {
+      for( let frequency of uniqueFrequencies ) {
 
         const outputIndexs = [];
         if( member.oneCPPNPerFrequency ) {
@@ -214,12 +221,13 @@ class Activator {
         } // otherwise we have one CPPN for all frequencies
 
         // collect output indexes associated with the input periods value being activated for
-        _outputsToActivate.forEach( oneOutput => {
+        // _outputsToActivate.forEach( oneOutput => {
+        for( let oneOutput of _outputsToActivate ) {
           const memberOutputsKey = getMemberOutputsKey( oneOutput );
           if( frequency == memberOutputs.get(memberOutputsKey).frequency ) {
             outputIndexs.push( parseInt(oneOutput.index) ); // when patch comes in from asNEAT, the index is a string
           }
-        });
+        } //);
           
         // console.log("---frequency:",frequency);
         const inputPeriods = frequency * (_totalSampleCount / this.sampleRate);
@@ -242,8 +250,9 @@ class Activator {
               inputPeriods,
               variationOnPeriods,
               velocity
-            ).then( outputSignals => {
-              outputIndexs.forEach( async outputIndex => {
+            ).then( async outputSignals => {
+              // outputIndexs.forEach( async outputIndex => {
+              for( let outputIndex of outputIndexs ) {
                 const memberOutputsKey = getMemberOutputsKey( {index: outputIndex, frequency} );
                 if( reverse ) outputSignals[outputIndex].reverse();
                 let _samples;
@@ -255,7 +264,8 @@ class Activator {
                   _samples = outputSignals[outputIndex];
                 }
                 memberOutputs.get( memberOutputsKey ).samples = _samples;
-              });
+              }
+              // );
             }).catch(e => {
               console.error("Error in renderOutputSignalsWithGPU", e);
               // reload in hopse that the GPU rendering error will be resolved by that
@@ -273,7 +283,8 @@ class Activator {
           let outputSignals = this.getOutputSignals(
             inputSignals, outputIndexs, memberCPPN );
 
-          outputIndexs.forEach( async outputIndex => {
+          // outputIndexs.forEach( async outputIndex => {
+          for( let outputIndex of outputIndexs ) {
             const memberOutputsKey = getMemberOutputsKey( {index: outputIndex, frequency} );
             if( reverse ) outputSignals[outputIndex].reverse();
             let _samples;
@@ -285,7 +296,7 @@ class Activator {
               _samples = outputSignals[outputIndex];
             }   
             memberOutputs.get( memberOutputsKey ).samples = _samples;
-          });
+          } //);
         }
 
         // const startApplyMemberOutputs = performance.now();
@@ -296,7 +307,8 @@ class Activator {
         // const endApplyMemberOutputs = performance.now();
         // console.log(`%c Applying member outputs for one input period took ${endApplyMemberOutputs - startApplyMemberOutputs} milliseconds`,'color:orange');
 
-      }.bind(this));
+      }
+      //.bind(this));
 
       const networkActivationEnd = performance.now();
       if(ENVIRONMENT_IS_NODE && process.env.LOG_LEVEL === "debug") {
@@ -308,14 +320,26 @@ class Activator {
 
       if( outputSignalsPromises.length ) {
         Promise.all( outputSignalsPromises ).then( () => {
-          if( memberOutputs.size ) {
-            resolve( memberOutputs );
-          } else {
-            reject( "No member outputs activated" );
+          try {
+            if( memberOutputs.size ) {
+              const result = new Map(memberOutputs);
+              memberOutputs.clear();
+              resolve( result );
+            } else {
+              reject( "No member outputs activated" );
+            }
+          } finally {
+            memberOutputs = null;
           }
         });
       } else {
-        resolve( memberOutputs );
+        try {
+          const result = new Map(memberOutputs);
+          memberOutputs.clear();
+          resolve( result );
+        } finally {
+          memberOutputs = null;
+        }
       }
     });
   }
@@ -391,7 +415,8 @@ class Activator {
 
     const outputNodes = {};
     const requiredNodesForOutputNode = {};
-    outputIndexes.forEach( oneOutputIndex => {
+    // outputIndexes.forEach( oneOutputIndex => {
+    for( let oneOutputIndex of outputIndexes ) {
       const fIx = totalIn + oneOutputIndex;
       if( stringFunctions[fIx] ) {
 
@@ -399,7 +424,7 @@ class Activator {
 
         outputNodes[fIx] = this.renameNodeOutputsInStringFunc( stringFunctions[fIx] );
       }
-    });
+    } //);
     // console.log("---outputNodes:",outputNodes);
     // console.log("---requiredNodesForOutputNode:", requiredNodesForOutputNode);
     const requiredNodeIndexes = [
@@ -408,11 +433,13 @@ class Activator {
     // console.log("---requiredNodeIndexes:",requiredNodeIndexes);
 
     const requiredNodes = {};
-    Object.keys(requiredNodeIndexes)
-    .filter( i => i >= totalIn ).forEach( oneRequiredNodeIndex => {
+    let filteredRequiredNodeIndexes = Object.keys(requiredNodeIndexes).filter( i => i >= totalIn );
+    // Object.keys(requiredNodeIndexes)
+    // .filter( i => i >= totalIn ).forEach( oneRequiredNodeIndex => {
+    for( let oneRequiredNodeIndex of filteredRequiredNodeIndexes ) {
       requiredNodes[oneRequiredNodeIndex] = this.renameNodeOutputsInStringFunc(
         stringFunctions[oneRequiredNodeIndex] ) ;
-    });
+    } //);
 
 
     let isOffscreenCanvasAvailable = false;
@@ -435,7 +462,9 @@ class Activator {
     let networkActivationWorkerMessages = [];
     let deferreds = [];
 
-    outputIndexes.map( i => i + totalIn ).forEach( oneOutputIndex => {
+    let updatedOutputIndexes = outputIndexes.map( i => i + totalIn );
+    // outputIndexes.map( i => i + totalIn ).forEach( oneOutputIndex => {
+    for( let oneOutputIndex of updatedOutputIndexes ) {
       const allRequiredNodeIndexes = [
         ...requiredNodesForOutputNode[oneOutputIndex], `${oneOutputIndex}`
       ].reduce( (map, val) => { map[val] = true; return map; }, {} );
@@ -456,7 +485,6 @@ class Activator {
           deferreds.push({resolve, reject}) );
 
         activationPromises.push( oneActivationPromise );
-
       } else {
         //TODO: look into combining kernels: https://github.com/gpujs/gpu.js/#combining-kernels
         //    ...or https://github.com/gpujs/gpu.js/#create-kernel-map
@@ -484,7 +512,9 @@ class Activator {
         activationPromises.push(
           new Promise( (resolve, reject) => {
             try {
+              // console.log("---oneOutputKernel:",oneOutputKernel);
               let outputResult = oneOutputKernel();
+              oneOutputKernel.kernel.texture.delete();
               resolve( outputResult );
             } catch (e) {
               reject( e );
@@ -493,7 +523,7 @@ class Activator {
         );
       }
 
-    });
+    } //);
 /*
     if( networkActivationWorkerMessages.length ) {
       // call function to create a NetworkActivationGPUWorker,

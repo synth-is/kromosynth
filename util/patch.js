@@ -35,24 +35,28 @@ export async function doesPatchNetworkHaveMinimumFitness(
     console.error("getOutputsForMemberInCurrentPopulation rejected:", e);
   } );
   let audioBufferAndCanvas;
-  if( memberOutputs ) {
-    audioBufferAndCanvas = await getAudioBuffersForMember(
-      memberOutputs,
-      0, // populationIndex
-      0, // memberIndexOrKey
-      duration, // duration
-      null, // noteDelta
-      null, //reverse
-      audioCtx.sampleRate, // sample rate
-      synthIsPatch,
-      false, // renderSpectrograms
-      null, // spectrogramDimensions
-      undefined, // getDataArray
-      offlineAudioContext,
-      audioCtx
-    ).catch( e => {
-      console.error("getAudioBuffersForMember rejected:", e);
-    } );
+  try {
+    if( memberOutputs ) {
+      audioBufferAndCanvas = await getAudioBuffersForMember(
+        memberOutputs,
+        0, // populationIndex
+        0, // memberIndexOrKey
+        duration, // duration
+        null, // noteDelta
+        null, //reverse
+        audioCtx.sampleRate, // sample rate
+        synthIsPatch,
+        false, // renderSpectrograms
+        null, // spectrogramDimensions
+        undefined, // getDataArray
+        offlineAudioContext,
+        audioCtx
+      ).catch( e => {
+        console.error("getAudioBuffersForMember rejected:", e);
+      } );
+    }
+  } finally {
+    memberOutputs = null;
   }
   if( audioBufferAndCanvas && audioBufferAndCanvas.audioBuffer ) {
     const audioBuffer = audioBufferAndCanvas.audioBuffer;

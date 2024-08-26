@@ -11,8 +11,8 @@ import clone from 'clone';
 // import ActivationSubWorker from "./workers/network-activation-sub-worker.js?worker";
 import { partial } from 'lodash-es';
 
-let activator;
-let renderer;
+// let activator;
+// let renderer;
 
 ///// network activation
 
@@ -93,46 +93,62 @@ function getOutputsForMemberInCurrentPopulation(
 
       if( true /*useGPU*/ ) { // for now always going this route and let activator.activateMember handle the choice of CPU vs GPU; multiple workers not relevant when distributing rendering across multiple rendering node instances
 
-        // keep singleton instance
-        if( ! activator || activator.sampleRate !== sampleRate ) {
-          activator = new Activator( sampleRate );
-        }
+        // // keep singleton instance
+        // if( ! activator || activator.sampleRate !== sampleRate ) {
+        //   activator = new Activator( sampleRate );
+        // }
 
-        activator.activateMember(
-          member,
-          currentPatch,
-          outputsToActivate,
-          _totalSampleCount,
-          null, /* sampleCountToActivate */
-          null, /* sampleOffset */
-          useGPU,
-          reverse,
-          true, /* variationOnPeriods */
-          velocity,
-          antiAliasing
-        ).then( memberOutputs => {
-            resolve( memberOutputs );
-          },
-          rejection => reject( rejection )
-        ).catch( e => {
-          console.error("failed to activateMember on GPU", member);
-          // TODO: encapsulate those things in functions
-          // ... TODO: no longer in use - won't be used?
-          spawnMultipleNetworkActivationWebWorkers({
-            populationIndex,
-            memberIndex, // TOOO: handle if scratchpad member; we've already fetched the member above
-            outputsToActivate,
+        let activator = new Activator( sampleRate );
+
+        try {
+
+          activator.activateMember(
             member,
             currentPatch,
-            sampleRate,
-            totalSampleCount: _totalSampleCount,
-            velocity
-          }).then(
-            memberOutputs => resolve( memberOutputs ),
+            outputsToActivate,
+            _totalSampleCount,
+            null, /* sampleCountToActivate */
+            null, /* sampleOffset */
+            useGPU,
+            reverse,
+            true, /* variationOnPeriods */
+            velocity,
+            antiAliasing
+          ).then( memberOutputs => {
+            try {
+              resolve( memberOutputs );
+            } finally {
+              memberOutputs = undefined;
+            }
+          },
             rejection => reject( rejection )
-          );
-          // reject("failed to activateMember on GPU");
-        });
+          ).catch( e => {
+            console.error("failed to activateMember on GPU", member);
+            // TODO: encapsulate those things in functions
+            // ... TODO: no longer in use - won't be used?
+            spawnMultipleNetworkActivationWebWorkers({
+              populationIndex,
+              memberIndex, // TOOO: handle if scratchpad member; we've already fetched the member above
+              outputsToActivate,
+              member,
+              currentPatch,
+              sampleRate,
+              totalSampleCount: _totalSampleCount,
+              velocity
+            }).then(
+              memberOutputs => resolve( memberOutputs ),
+              rejection => reject( rejection )
+            );
+            // reject("failed to activateMember on GPU");
+          });
+
+        } finally {
+          activator = undefined;
+        }
+
+        // resolve( new Map() );
+
+
       } else {
 
         // Perform network actiation on worker
@@ -452,9 +468,11 @@ function getAudioBuffersForMember(
     if( duration ) patch.duration = duration;
 
     // keep a singleton instance
-    if( ! renderer || renderer.sampleRate !== sampleRateIn ) {
-      renderer = new Renderer( sampleRateIn );
-    }
+    // if( ! renderer || renderer.sampleRate !== sampleRateIn ) {
+    //   renderer = new Renderer( sampleRateIn );
+    // }
+
+    let renderer = new Renderer( sampleRateIn );
 
     // Render an audio graph with Renderer,
     // providing it with an audio graph patch from application state.
