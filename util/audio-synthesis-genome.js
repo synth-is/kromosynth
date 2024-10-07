@@ -151,7 +151,8 @@ export async function getNewAudioSynthesisGenomeByMutation(
       false, // checkDataAmplitude
       offlineAudioContext,
       patchFitnessTestDuration
-      );
+    );
+    offlineAudioContext = undefined;
     if( ! patchOK ) {
       defectivePatches.push( asNEATPatch );
     }

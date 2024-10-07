@@ -123,7 +123,10 @@ class Renderer {
         // https://developer.mozilla.org/en-US/docs/Web/API/ScriptProcessorNode
         // https://developer.mozilla.org/en-US/docs/Web/API/AudioWorkletNode
         let freqDataArrays;
-        if( spectrogramDimensions && virtualAudioGraph.audioContext.createScriptProcessor && typeof virtualAudioGraph.audioContext.createScriptProcessor === 'function' ) {
+        if( // TODO after upgrading node-web-audio-api, AudioDestinationNode is not defined, so we'll disable this for now; it was specific to the web IEC presentation
+          false
+          // spectrogramDimensions && virtualAudioGraph.audioContext.createScriptProcessor && typeof virtualAudioGraph.audioContext.createScriptProcessor === 'function' 
+        ) {
 
           // https://gist.github.com/moust/95f5cd5daa095f1aad89
           // https://stackoverflow.com/a/46069463/169858

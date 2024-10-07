@@ -344,9 +344,60 @@ class Activator {
     });
   }
 
-  async downsampleAndFilterOversampledSignal(input, inputSampleRate, outputSampleRate) {
+  // async downsampleAndFilterOversampledSignal(input, inputSampleRate, outputSampleRate) {
+  //   // Calculate the length of the output signal
+  //   const outputLength = Math.floor(input.length * outputSampleRate / inputSampleRate);
+    
+  //   // Create an offline context for the oversampled rate
+  //   const offlineCtxOversampled = new OfflineAudioContext(1, input.length, inputSampleRate);
+    
+  //   // Create a buffer source for the oversampled context
+  //   let inputBuffer = offlineCtxOversampled.createBuffer(1, input.length, inputSampleRate);
+  //   inputBuffer.copyToChannel(input, 0);
+    
+  //   // Create the anti-aliasing filter (lowpass filter at Nyquist frequency)
+  //   const nyquistFrequency = outputSampleRate / 2;
+  //   const filter = offlineCtxOversampled.createBiquadFilter();
+  //   filter.type = 'lowpass';
+  //   filter.frequency.value = nyquistFrequency;
+    
+  //   // Connect filter
+  //   const source = offlineCtxOversampled.createBufferSource();
+  //   source.buffer = inputBuffer;
+  //   source.connect(filter).connect(offlineCtxOversampled.destination);
+  //   source.start(0);
+  
+  //   // Render the buffer
+  //   const renderedBuffer = await offlineCtxOversampled.startRendering();
+    
+  //   // Create an offline context for the downsampled rate
+  //   const offlineCtxDownsampled = new OfflineAudioContext(1, outputLength, outputSampleRate);
+  
+  //   // Create a buffer source for the downsampled context
+  //   let outputBuffer = offlineCtxDownsampled.createBuffer(1, outputLength, outputSampleRate);
+  //   outputBuffer.copyToChannel(renderedBuffer.getChannelData(0), 0);
+    
+  //   const outputSource = offlineCtxDownsampled.createBufferSource();
+  //   outputSource.buffer = outputBuffer;
+  //   outputSource.connect(offlineCtxDownsampled.destination);
+  //   outputSource.start(0);
+  
+  //   // Render and return anti-aliased buffer
+  //   const downsampledRenderedBuffer = await offlineCtxDownsampled.startRendering();
+    
+  //   // Get Float32Array from the anti-aliased and downsampled buffer
+  //   const downsampledData = downsampledRenderedBuffer.getChannelData(0);
+    
+  //   return downsampledData;
+  // }
+
+  async downsampleAndFilterOversampledSignal(input, totalSampleCount, targetSampleCount) {
+    const baseSampleRate = this.sampleRate;
+    const inputSampleRate = baseSampleRate * (totalSampleCount / targetSampleCount);
+    const outputSampleRate = baseSampleRate;
+  
     // Calculate the length of the output signal
-    const outputLength = Math.floor(input.length * outputSampleRate / inputSampleRate);
+    const outputLength = targetSampleCount;
     
     // Create an offline context for the oversampled rate
     const offlineCtxOversampled = new OfflineAudioContext(1, input.length, inputSampleRate);
@@ -386,9 +437,7 @@ class Activator {
     const downsampledRenderedBuffer = await offlineCtxDownsampled.startRendering();
     
     // Get Float32Array from the anti-aliased and downsampled buffer
-    const downsampledData = downsampledRenderedBuffer.getChannelData(0);
-    
-    return downsampledData;
+    return downsampledRenderedBuffer.getChannelData(0);
   }
 
   /////////// GPU - begin
