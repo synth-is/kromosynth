@@ -6,7 +6,7 @@ import {
 import { patchFromAsNEATnetwork } from './audio-graph-asNEAT-bridge.js';
 import isString from "lodash-es/isString.js";
 
-export function renderAudio(
+export async function renderAudio(
   asNEATPatch, waveNetwork, duration = 1, noteDelta = 0, velocity = 1, sampleRate,
   reverse,
   asDataArray,
@@ -22,7 +22,7 @@ export function renderAudio(
   if( Array.isArray(noteDelta) ) noteDelta = noteDelta[0];
   if( Array.isArray(velocity) ) velocity = velocity[0];
 
-  return renderAudioAndSpectrogram(
+  const audioBufferAndCanvas = await renderAudioAndSpectrogram(
     asNEATPatch, waveNetwork, duration, noteDelta, velocity, sampleRate,
     reverse,
     asDataArray,
@@ -32,12 +32,11 @@ export function renderAudio(
     useGPU,
     antiAliasing,
     frequencyUpdatesApplyToAllPathcNetworkOutputs
-  ).then( audioBufferAndCanvas => {
-    if( ! audioBufferAndCanvas ) {
-      console.error("No audioBufferAndCanvas");
-    }
-    return audioBufferAndCanvas ? audioBufferAndCanvas.audioBuffer : null;
-  } );
+  );
+  if (!audioBufferAndCanvas) {
+    console.error("No audioBufferAndCanvas");
+  }
+  return audioBufferAndCanvas ? audioBufferAndCanvas.audioBuffer : null;
 }
 
 export function renderAudioFromPatchAndMember(
@@ -94,7 +93,7 @@ export function renderAudioAndSpectrogram(
   );
 }
 
-export function renderAudioAndSpectrogramFromPatchAndMember(
+export async function renderAudioAndSpectrogramFromPatchAndMember(
   synthIsPatch, waveNetwork, duration, noteDelta, velocity = 1, sampleRate,
   reverse,
   asDataArray,
@@ -105,39 +104,27 @@ export function renderAudioAndSpectrogramFromPatchAndMember(
   antiAliasing = false,
   frequencyUpdatesApplyToAllPathcNetworkOutputs = false
 ) {
-  return new Promise( (resolve,reject) => {
-    startMemberOutputsRendering(
-      waveNetwork, synthIsPatch,
-      duration,
-      noteDelta,
-      sampleRate,
-      velocity,
-      reverse,
-      useOvertoneInharmonicityFactors,
-      useGPU,
-      antiAliasing,
-      frequencyUpdatesApplyToAllPathcNetworkOutputs
-    ).then( memberOutputs => {
-      // console.log("memberOutputs",memberOutputs);
-      try {
-        startAudioBuffersRendering(
-          memberOutputs, synthIsPatch, duration, noteDelta, sampleRate, asDataArray,
-          offlineAudioContext,
-          audioContext,
-          useOvertoneInharmonicityFactors,
-          frequencyUpdatesApplyToAllPathcNetworkOutputs
-        ).then( audioBufferAndCanvas => {
-          return resolve( audioBufferAndCanvas )
-        } )
-        .catch( e => reject(e) );
-      } finally {
-        memberOutputs.clear();
-        memberOutputs = null;
-      }
-    }).catch( e => reject(e) );
-  }).catch( async e => {
-    console.error(e); // TODO: error creating virtual audio graph here
-  } );
+  const memberOutputs = await startMemberOutputsRendering(
+    waveNetwork, synthIsPatch,
+    duration,
+    noteDelta,
+    sampleRate,
+    velocity,
+    reverse,
+    useOvertoneInharmonicityFactors,
+    useGPU,
+    antiAliasing,
+    frequencyUpdatesApplyToAllPathcNetworkOutputs
+  )
+  const audioBufferAndCanvas = await startAudioBuffersRendering(
+    memberOutputs, synthIsPatch, duration, noteDelta, sampleRate, asDataArray,
+    offlineAudioContext,
+    audioContext,
+    useOvertoneInharmonicityFactors,
+    frequencyUpdatesApplyToAllPathcNetworkOutputs
+  );
+
+  return audioBufferAndCanvas;
 }
 
 export function wireUpAudioGraphForPatchAndWaveNetwork(

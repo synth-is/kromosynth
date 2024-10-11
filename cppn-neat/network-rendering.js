@@ -217,7 +217,8 @@ class Renderer {
               audioBuffer: networkIndividualSound,
               canvasDataURL: null,
               canvasBlob: null
-            })
+            });
+            offlineAudioContextInstance = null;
           }
 
         }.bind(this)).catch(function( err ) {
@@ -225,6 +226,7 @@ class Renderer {
 
           reject( "Not able to render audio buffer from member outputs with provided audio graph patch: "
             + err );
+          offlineAudioContextInstance = null;
         });
 
       }).catch( // this.wireUpAudioGraphAndConnectToAudioContextDestination(
