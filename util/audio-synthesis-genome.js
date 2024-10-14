@@ -58,7 +58,8 @@ export async function getNewAudioSynthesisGenomeByMutation(
     asNEATMutationParams = {}, // TODO: this could be obtained from evoParams (below)
     evoParams,
     OfflineAudioContext,
-    patchFitnessTestDuration
+    patchFitnessTestDuration,
+    useGPU
 ) {
   let waveNetwork, asNEATPatch;
   // TODO: the rationale behind this condition needs to be revisited (and then it needs to include PartialEnvelopeNetworkOutputNode and PartialNetworkOutputNode)
@@ -150,7 +151,8 @@ export async function getNewAudioSynthesisGenomeByMutation(
       audioCtx,
       false, // checkDataAmplitude
       offlineAudioContext,
-      patchFitnessTestDuration
+      patchFitnessTestDuration,
+      useGPU
     );
     offlineAudioContext = undefined;
     if( ! patchOK ) {

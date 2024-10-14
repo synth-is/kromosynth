@@ -10,7 +10,8 @@ export async function doesPatchNetworkHaveMinimumFitness(
   // TODO offlineAudioContext
   checkDataAmplitude,
   offlineAudioContext,
-  patchFitnessTestDuration
+  patchFitnessTestDuration,
+  useGPU = true
 ) {
   let hasMinimumFitness = false;
   // verify suitability of x by running it through virtualAudioGraph
@@ -25,7 +26,7 @@ export async function doesPatchNetworkHaveMinimumFitness(
     null, // totalSampleCount
     null, // outputsToActivate
     null, // noteDelta
-    true, // useGPU
+    useGPU,
     null, // sampleRateIn
     waveNetworkPopulationMember,
     synthIsPatch,
