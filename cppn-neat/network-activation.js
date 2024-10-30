@@ -563,7 +563,7 @@ class Activator {
             try {
               // console.log("---oneOutputKernel:",oneOutputKernel);
               let outputResult = oneOutputKernel();
-              oneOutputKernel.kernel.texture.delete();
+              if(oneOutputKernel.kernel && oneOutputKernel.kernel.texture) oneOutputKernel.kernel.texture.delete();
               resolve( outputResult );
             } catch (e) {
               reject( e );
