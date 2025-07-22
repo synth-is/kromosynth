@@ -42,3 +42,6 @@ export {
 export {
   getRoundedFrequencyValue,
 } from "./util/range.js";
+
+export { default as Activator } from "./cppn-neat/network-activation.js";
+export { default as Evolver } from "./cppn-neat/network-evolution.js";
