@@ -104,9 +104,11 @@ class Evolver {
 
   /**
    * create initial seed genomes for coming population(s members)
+   * @param {number} cppnInputCount - Number of input nodes (overrides INPUTS constant)
+   * @param {number} cppnOutputCount - Number of output nodes (overrides OUTPUTS constant)
    * @return {Array} Seed genomes
    */
-  _getInitialPopulationSeeds( cppnOutputCount ) {
+  _getInitialPopulationSeeds( cppnInputCount, cppnOutputCount ) {
     const initialPopulationSeeds = [];
     for( let i=0; i < SEED_COUNT; i++ ) {
       //clear out genome IDs and innovation IDs
@@ -115,7 +117,7 @@ class Evolver {
       // NeatGenome.Help.resetInnovationID();
 
       var neatGenome = neatjs.neatGenome.Help.CreateGenomeByInnovation(
-                INPUTS,
+                cppnInputCount || INPUTS,
                 cppnOutputCount || OUTPUTS,
                 {
                   connectionProportion: CONNECTION_PROPORTION,
@@ -171,6 +173,7 @@ class Evolver {
       iecOptions = {
         initialMutationCount : iecOpt.initialMutationCount,
         postMutationCount : iecOpt.postMutationCount,  // AKA mutationsOnCreation
+        cppnInputCount : iecOpt.cppnInputCount,
         cppnOutputCount : iecOpt.cppnOutputCount
       };
     } else {
@@ -183,7 +186,10 @@ class Evolver {
       };
     }
 
-    const initialPopulationSeeds = this._getInitialPopulationSeeds( iecOptions.cppnOutputCount );
+    const initialPopulationSeeds = this._getInitialPopulationSeeds( 
+      iecOptions.cppnInputCount,
+      iecOptions.cppnOutputCount 
+    );
 
     return new neatjs.iec(
       np,
