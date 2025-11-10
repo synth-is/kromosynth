@@ -130,6 +130,9 @@ class Activator {
       }
     } else {
       _totalSampleCount = totalSampleCount;
+      if( sampleCountToActivate ) {
+        _sampleCountToActivate = sampleCountToActivate;
+      }
     }
 
     if( ! _sampleCountToActivate ) {
@@ -247,6 +250,8 @@ class Activator {
               3, // totalIn - TODO: infer from CPPN somehow?
               outputIndexs,
               _totalSampleCount,
+              _sampleCountToActivate,
+              sampleOffset,
               inputPeriods,
               variationOnPeriods,
               velocity
@@ -290,7 +295,9 @@ class Activator {
             let _samples;
             if( antiAliasing ) {
               _samples = await this.downsampleAndFilterOversampledSignal(
-                outputSignals[outputIndex], _totalSampleCount, totalSampleCount
+                outputSignals[outputIndex], 
+                _sampleCountToActivate, // _totalSampleCount, 
+                sampleCountToActivate || totalSampleCount
               );
             } else {
               _samples = outputSignals[outputIndex];
@@ -452,7 +459,8 @@ class Activator {
 
   renderOutputSignalsWithGPU(
     nodeOrder, stringFunctions, totalIn, outputIndexes,
-    sampleCount, inputPeriods, variationOnPeriods,
+    totalSampleCount, sampleCountToActivate, sampleOffset,
+    inputPeriods, variationOnPeriods,
     velocity = 1
   ) {
     // console.log("---renderOutputSignalsWithGPU outputIndexes:",outputIndexes,
@@ -472,6 +480,11 @@ class Activator {
         requiredNodesForOutputNode[fIx] = this.getRequiredNodes( fIx, stringFunctions );
 
         outputNodes[fIx] = this.renameNodeOutputsInStringFunc( stringFunctions[fIx] );
+      } else {
+        // Fix: Handle missing string functions for complex networks
+        console.warn(`Missing string function for output index ${oneOutputIndex} (fIx: ${fIx})`);
+        outputNodes[fIx] = 'return 0.0;'; // Provide safe default
+        requiredNodesForOutputNode[fIx] = []; // Empty dependencies
       }
     } //);
     // console.log("---outputNodes:",outputNodes);
@@ -525,7 +538,9 @@ class Activator {
 
         networkActivationWorkerMessages.push({
             activationStringForOneOutput,
-            sampleCount,
+            totalSampleCount,
+            sampleCountToActivate,
+            sampleOffset,
             inputPeriods,
             variationOnPeriods,
             velocity
@@ -540,12 +555,14 @@ class Activator {
         const settings = {
           name: 'cppnNetworkActivation',
           constants: {
-            totalSampleCount: sampleCount,
-            inputPeriods: inputPeriods,
+            totalSampleCount,
+            sampleCountToActivate: sampleCountToActivate || totalSampleCount,
+            sampleOffset: sampleOffset || 0,
+            inputPeriods,
             variationOnPeriods: variationOnPeriods ? 1 : 0,
             velocity
           },
-          output: [sampleCount]
+          output: [sampleCountToActivate || totalSampleCount]
         };
 
         const gpu = new GPU();
@@ -634,35 +651,32 @@ class Activator {
   }
 
   renameNodeOutputsInStringFunc( strFnc ) {
-
+    // Fix: Add null/undefined check to prevent "Cannot read properties of undefined" error
+    if (!strFnc || typeof strFnc !== 'string') {
+      console.warn('renameNodeOutputsInStringFunc received invalid input:', strFnc);
+      return 'return 0.0;'; // Return a safe default function
+    }
+    
     return strFnc
       .replace(new RegExp("this\\.rf\\[(.+?)\\]", "g"), "node$1")
       .replace( /Math\.PI/g, "3.141592653589793" );
   }
 
   getInputNodeStrings() {
-/*
-    const inputNodeString = `
-    const node0 = 1.0;
-
-    const sampleNumber = this.thread.x;
-    const totalSampleCount = this.constants.totalSampleCount;
-    const rangeFraction = sampleNumber / (totalSampleCount-1);
-    const node1 = -1 + rangeFraction * 2; // this.lerp( -1, 1, rangeFraction );
-
-    let extraInput = 0.0;
-    if( this.constants.variationOnPeriods === 1 ) {
-      extraInput = Math.sin( this.constants.inputPeriods * node1 );
-    } else {
-      extraInput = Math.sin( this.constants.inputPeriods * Math.abs(node1) );
-    }
-    const node2 = extraInput;
-    `;
-*/
     const inputNodeString = `
       const node0 = getBias();
-      const node2 = getInputSignalMain();
-      const node1 = getInputSignalExtra( node2 );
+      
+      const sampleNumber = this.thread.x + this.constants.sampleOffset;
+      const rangeFraction = sampleNumber / (this.constants.totalSampleCount-1);
+      const node2 = -1 + rangeFraction * 2;
+      
+      let extraInput = 0.0;
+      if( this.constants.variationOnPeriods === 1 ) {
+        extraInput = Math.sin( this.constants.inputPeriods * node2 );
+      } else {
+        extraInput = Math.sin( this.constants.inputPeriods * Math.abs(node2) );
+      }
+      const node1 = extraInput * this.constants.velocity;
     `;
     return inputNodeString;
   }
@@ -671,23 +685,28 @@ class Activator {
     nodeOrder, allRequiredNodeIndexes, requiredNodes, outputNodes
   ) {
     let requiredNodeStrings = this.getInputNodeStrings();
+    const declaredNodes = new Set([0, 1, 2]); // Track declared nodes (input nodes already declared in getInputNodeStrings)
+    
     nodeOrder.forEach( oneNodeIndex => {
-      if( allRequiredNodeIndexes[oneNodeIndex] ) {
+      if( allRequiredNodeIndexes[oneNodeIndex] && !declaredNodes.has(oneNodeIndex) ) {
         const requiredNodeString = requiredNodes[oneNodeIndex];
-        if( requiredNodeString ) {
-          requiredNodeStrings = requiredNodeStrings.concat(
-            requiredNodeString.replace( /^return/, `
-              const node${oneNodeIndex} =` )
-          );
-        }
         const outputNodeString = outputNodes[oneNodeIndex];
+        
+        // Prioritize output nodes over required nodes if both exist
         if( outputNodeString ) {
           requiredNodeStrings = requiredNodeStrings.concat(
             outputNodeString.replace( /^return/, `
               const node${oneNodeIndex} =` )
           ).concat(`
             return node${oneNodeIndex};
-          `)
+          `);
+          declaredNodes.add(oneNodeIndex);
+        } else if( requiredNodeString ) {
+          requiredNodeStrings = requiredNodeStrings.concat(
+            requiredNodeString.replace( /^return/, `
+              const node${oneNodeIndex} =` )
+          );
+          declaredNodes.add(oneNodeIndex);
         }
       }
     });

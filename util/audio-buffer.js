@@ -15,8 +15,10 @@ export function getAudioBuffer( samplesArrays, audioCtx, sampleCount ) {
 
         // This gives us the actual ArrayBuffer that contains the data
         let nowBuffering = arrayBuffer.getChannelData( channel );
-        let networkOutputBuffer = ensureBufferStartsAndEndsAtZero(
-        samplesArrays[channel] );
+        let networkOutputBuffer = samplesArrays[channel];
+        // ensureBufferStartsAndEndsAtZero(
+        //     samplesArrays[channel] 
+        // );
         for( let i=0; i < sampleCount; i++ ) {
         nowBuffering[i] = networkOutputBuffer[i];
         }
@@ -59,7 +61,8 @@ export function normalizeAudioBuffer( renderedBuffer, sampleCount, audioContext,
         networkIndividualSound = bufferChannelData;
     } else {
         const renderedBufferAfterRemapToRange = getAudioBuffer( [bufferChannelData], audioContext, sampleCount );
-        networkIndividualSound = ensureBufferStartsAndEndsAtZero(renderedBufferAfterRemapToRange);
+        // networkIndividualSound = ensureBufferStartsAndEndsAtZero(renderedBufferAfterRemapToRange);
+        networkIndividualSound = renderedBufferAfterRemapToRange;
     }
     return networkIndividualSound;
 }
@@ -124,7 +127,9 @@ export async function getAudioBufferFromGenomeAndMeta(
     useOvertoneInharmonicityFactors,
     useGPU,
     antiAliasing = false,
-    frequencyUpdatesApplyToAllPathcNetworkOutputs = false
+    frequencyUpdatesApplyToAllPathcNetworkOutputs = false,
+    sampleCountToActivate,
+    sampleOffset,
 ) {
     let audioBuffer;
     if( genomeAndMeta.type === "favoriteSound" ) {
@@ -139,7 +144,9 @@ export async function getAudioBufferFromGenomeAndMeta(
             useOvertoneInharmonicityFactors,
             useGPU,
             antiAliasing,
-            frequencyUpdatesApplyToAllPathcNetworkOutputs
+            frequencyUpdatesApplyToAllPathcNetworkOutputs,
+            sampleCountToActivate,
+            sampleOffset,
         );
     } else {
         let genome;
@@ -159,7 +166,9 @@ export async function getAudioBufferFromGenomeAndMeta(
             useOvertoneInharmonicityFactors,
             useGPU,
             antiAliasing,
-            frequencyUpdatesApplyToAllPathcNetworkOutputs
+            frequencyUpdatesApplyToAllPathcNetworkOutputs,
+            sampleCountToActivate,
+            sampleOffset,
         );
     }
     return audioBuffer;

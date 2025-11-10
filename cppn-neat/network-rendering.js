@@ -4,7 +4,7 @@ import { getMemberOutputsKey } from '../util/network-output.js';
 import { getFrequencyToNoteDelta } from '../wavekilde.js';
 // import { lerp } from '../util/range';
 import { getAudioBuffer, normalizeAudioBuffer } from '../util/audio-buffer.js';
-import createVirtualAudioGraph from 'virtual-audio-graph';
+import { createVirtualAudioGraphWithCompiler } from '../util/audio-graph-compiler.js';
 import clone from 'clone';  // TODO: replace with import cloneDeep from "lodash/cloneDeep"; ?
 import chroma from 'chroma-js';
 import isString from "lodash-es/isString.js";
@@ -41,7 +41,7 @@ class Renderer {
 
       // getWawetableSynthesisExampleGraph();
 
-      const virtualAudioGraph = createVirtualAudioGraph({
+      const virtualAudioGraph = createVirtualAudioGraphWithCompiler({
         audioContext: audioContextInstance,
         output: audioContextInstance.destination,
       });
@@ -828,10 +828,10 @@ class Renderer {
 
       wavetableNodeDefinition.push(
         `g${i}: ['gain', 'zero', {gain: ['setValueCurveAtTime', ${oneGainValueCurveKey}, currentTime, duration]}]`
-      );
+      ); // TODO a CPPN worklet would connect to the gain parameter of this node
       wavetableNodeDefinition.push(
         `a${i}: ['bufferSource', 'g${i}', {buffer: ${oneAudioWaveKey}}]`
-      );
+      ); // TODO this would be a CPPN worklet
     }
 
     const functionBody = `

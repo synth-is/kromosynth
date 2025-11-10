@@ -52,7 +52,9 @@ function getOutputsForMemberInCurrentPopulation(
   reverse,
   useOvertoneInharmonicityFactors,
   antiAliasing, // if true, oversample and low-pass filter
-  frequencyUpdatesApplyToAllPathcNetworkOutputs = false // regardless of whether they are connected to a buffer
+  frequencyUpdatesApplyToAllPathcNetworkOutputs = false, // regardless of whether they are connected to a buffer
+  sampleCountToActivate,
+  sampleOffset,
 ) {
   return new Promise( (resolve, reject) => {
 
@@ -107,8 +109,8 @@ function getOutputsForMemberInCurrentPopulation(
             currentPatch,
             outputsToActivate,
             _totalSampleCount,
-            null, /* sampleCountToActivate */
-            null, /* sampleOffset */
+            sampleCountToActivate,
+            sampleOffset,
             useGPU,
             reverse,
             true, /* variationOnPeriods */

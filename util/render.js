@@ -15,7 +15,9 @@ export async function renderAudio(
   useOvertoneInharmonicityFactors,
   useGPU,
   antiAliasing = false,
-  frequencyUpdatesApplyToAllPathcNetworkOutputs = false
+  frequencyUpdatesApplyToAllPathcNetworkOutputs = false,
+  sampleCountToActivate,
+  sampleOffset,
 ) {
   // anomaly handling
   if( Array.isArray(duration) ) duration = duration[0];
@@ -31,7 +33,9 @@ export async function renderAudio(
     useOvertoneInharmonicityFactors,
     useGPU,
     antiAliasing,
-    frequencyUpdatesApplyToAllPathcNetworkOutputs
+    frequencyUpdatesApplyToAllPathcNetworkOutputs,
+    sampleCountToActivate,
+    sampleOffset,
   );
   if (!audioBufferAndCanvas) {
     console.error("No audioBufferAndCanvas");
@@ -48,7 +52,9 @@ export function renderAudioFromPatchAndMember(
   useOvertoneInharmonicityFactors,
   useGPU,
   antiAliasing = false,
-  frequencyUpdatesApplyToAllPathcNetworkOutputs = false
+  frequencyUpdatesApplyToAllPathcNetworkOutputs = false,
+  sampleCountToActivate,
+  sampleOffset,
 ) {
   return renderAudioAndSpectrogramFromPatchAndMember(
     synthIsPatch, waveNetwork, duration, noteDelta, velocity, sampleRate,
@@ -59,7 +65,9 @@ export function renderAudioFromPatchAndMember(
     useOvertoneInharmonicityFactors,
     useGPU,
     antiAliasing,
-    frequencyUpdatesApplyToAllPathcNetworkOutputs
+    frequencyUpdatesApplyToAllPathcNetworkOutputs,
+    sampleCountToActivate,
+    sampleOffset,
   ).then(audioBufferAndCanvas => {
     const {audioBuffer} = audioBufferAndCanvas;
     return audioBuffer;
@@ -75,7 +83,9 @@ export function renderAudioAndSpectrogram(
   useOvertoneInharmonicityFactors,
   useGPU,
   antiAliasing = false,
-  frequencyUpdatesApplyToAllPathcNetworkOutputs = false
+  frequencyUpdatesApplyToAllPathcNetworkOutputs = false,
+  sampleCountToActivate,
+  sampleOffset,
 ) {
   const asNEATNetworkJSONString = isString(asNEATPatch) ? asNEATPatch : asNEATPatch.toJSON();
   const synthIsPatch = patchFromAsNEATnetwork( asNEATNetworkJSONString );
@@ -89,7 +99,9 @@ export function renderAudioAndSpectrogram(
     useOvertoneInharmonicityFactors,
     useGPU,
     antiAliasing,
-    frequencyUpdatesApplyToAllPathcNetworkOutputs
+    frequencyUpdatesApplyToAllPathcNetworkOutputs,
+    sampleCountToActivate,
+    sampleOffset,
   );
 }
 
@@ -102,7 +114,9 @@ export async function renderAudioAndSpectrogramFromPatchAndMember(
   useOvertoneInharmonicityFactors,
   useGPU,
   antiAliasing = false,
-  frequencyUpdatesApplyToAllPathcNetworkOutputs = false
+  frequencyUpdatesApplyToAllPathcNetworkOutputs = false,
+  sampleCountToActivate,
+  sampleOffset,
 ) {
   const memberOutputs = await startMemberOutputsRendering(
     waveNetwork, synthIsPatch,
@@ -114,10 +128,20 @@ export async function renderAudioAndSpectrogramFromPatchAndMember(
     useOvertoneInharmonicityFactors,
     useGPU,
     antiAliasing,
-    frequencyUpdatesApplyToAllPathcNetworkOutputs
+    frequencyUpdatesApplyToAllPathcNetworkOutputs,
+    sampleCountToActivate,
+    sampleOffset,
   )
+
+  // Adjust duration if sampleCountToActivate is set
+  let adjustedDuration = duration;
+  if (sampleCountToActivate) {
+    const totalSamples = duration * sampleRate;
+    adjustedDuration = (sampleCountToActivate / totalSamples) * duration;
+  }
+
   const audioBufferAndCanvas = await startAudioBuffersRendering(
-    memberOutputs, synthIsPatch, duration, noteDelta, sampleRate, asDataArray,
+    memberOutputs, synthIsPatch, adjustedDuration, noteDelta, sampleRate, asDataArray,
     offlineAudioContext,
     audioContext,
     useOvertoneInharmonicityFactors,
@@ -170,7 +194,9 @@ export function startMemberOutputsRendering(
   useOvertoneInharmonicityFactors,
   useGPU = true,
   antiAliasing = false,
-  frequencyUpdatesApplyToAllPathcNetworkOutputs = false
+  frequencyUpdatesApplyToAllPathcNetworkOutputs = false,
+  sampleCountToActivate,
+  sampleOffset,
   // TODO: should we accept audioContext instead of sampleRate, which can be obtained from the former?
 ) {
   return getOutputsForMemberInCurrentPopulation(
@@ -188,9 +214,13 @@ export function startMemberOutputsRendering(
     reverse,
     useOvertoneInharmonicityFactors,
     antiAliasing,
-    frequencyUpdatesApplyToAllPathcNetworkOutputs
+    frequencyUpdatesApplyToAllPathcNetworkOutputs,
+    sampleCountToActivate,
+    sampleOffset,
   );
 }
+
+// TODO: get audio buffer duration as a fraction according to sampleCountToActivate, if set
 
 export function startAudioBuffersRendering(
   memberOutputs, patch, duration, noteDelta, sampleRate, asDataArray,
