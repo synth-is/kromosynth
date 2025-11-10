@@ -135,7 +135,29 @@ export async function renderAudioStreamingHybrid(
     numberOfCPPNOutputs
   );
 
-  // Wire up the DSP audio graph with wrapper nodes
+  // Create mapping from patch networkOutput indices to sequential CPPN output indices
+  // The wrapper nodes are indexed sequentially (0, 1, 2, ..., N-1)
+  // But the patch references them by their networkOutput values
+  const outputIndexMapping = new Map();
+  synthIsPatch.networkOutputs.forEach((output, sequentialIndex) => {
+    outputIndexMapping.set(output.networkOutput, sequentialIndex);
+  });
+
+  console.log(`Created output index mapping: ${synthIsPatch.networkOutputs.length} outputs`);
+  if (process.env.LOG_LEVEL === 'debug') {
+    console.log('  Mapping:', Array.from(outputIndexMapping.entries()).slice(0, 5));
+  }
+
+  // Create remapped wrapper nodes using the patch's networkOutput indices
+  const remappedWrapperNodes = new Map();
+  for (const [networkOutputIndex, sequentialIndex] of outputIndexMapping.entries()) {
+    const wrapperNode = wrapperNodes.get(sequentialIndex);
+    if (wrapperNode) {
+      remappedWrapperNodes.set(networkOutputIndex, wrapperNode);
+    }
+  }
+
+  // Wire up the DSP audio graph with remapped wrapper nodes
   const renderer = new Renderer(sampleRate);
   const sampleCount = Math.floor(duration * sampleRate);
 
@@ -145,7 +167,7 @@ export async function renderAudioStreamingHybrid(
     noteDelta,
     audioContext,
     sampleCount,
-    wrapperNodes,
+    remappedWrapperNodes,
     'streaming'
   );
 
