@@ -41,6 +41,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import Activator from '../cppn-neat/network-activation.js';
 import { patchFromAsNEATnetwork } from './audio-graph-asNEAT-bridge.js';
+import { createCPPNWrapperNodes } from './cppn-wrapper-nodes.js';
 import isString from "lodash-es/isString.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -125,6 +126,14 @@ export async function renderAudioStreamingHybrid(
   // Create activator for CPPN
   const activator = new Activator(sampleRate, useGPU);
 
+  // Create wrapper gain nodes for CPPN outputs
+  // These connect AudioWorklet channels to virtual-audio-graph
+  const wrapperNodes = createCPPNWrapperNodes(
+    cppnOutputNode,
+    audioContext,
+    numberOfCPPNOutputs
+  );
+
   // Generate and stream CPPN chunks
   streamCPPNChunks(
     cppnOutputNode,
@@ -148,9 +157,11 @@ export async function renderAudioStreamingHybrid(
 
   return {
     cppnOutputNode,
+    wrapperNodes,
     synthIsPatch,
     numberOfCPPNOutputs,
-    activator
+    activator,
+    mode: 'streaming'
   };
 }
 
