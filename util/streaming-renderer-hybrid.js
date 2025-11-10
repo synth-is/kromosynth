@@ -42,6 +42,7 @@ import { dirname, join } from 'path';
 import Activator from '../cppn-neat/network-activation.js';
 import { patchFromAsNEATnetwork } from './audio-graph-asNEAT-bridge.js';
 import { createCPPNWrapperNodes } from './cppn-wrapper-nodes.js';
+import Renderer from '../cppn-neat/network-rendering.js';
 import isString from "lodash-es/isString.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -134,6 +135,22 @@ export async function renderAudioStreamingHybrid(
     numberOfCPPNOutputs
   );
 
+  // Wire up the DSP audio graph with wrapper nodes
+  const renderer = new Renderer(sampleRate);
+  const sampleCount = Math.floor(duration * sampleRate);
+
+  const virtualAudioGraph = await renderer.wireUpAudioGraphAndConnectToAudioContextDestination(
+    null, // memberOutputs not used in streaming mode
+    synthIsPatch,
+    noteDelta,
+    audioContext,
+    sampleCount,
+    wrapperNodes,
+    'streaming'
+  );
+
+  console.log('✅ DSP audio graph wired up with wrapper nodes');
+
   // Generate and stream CPPN chunks
   streamCPPNChunks(
     cppnOutputNode,
@@ -158,6 +175,7 @@ export async function renderAudioStreamingHybrid(
   return {
     cppnOutputNode,
     wrapperNodes,
+    virtualAudioGraph,
     synthIsPatch,
     numberOfCPPNOutputs,
     activator,

@@ -29,7 +29,9 @@ class Renderer {
   wireUpAudioGraphAndConnectToAudioContextDestination(
       memberOutputs, patch, noteDelta,
       audioContextInstance,
-      sampleCount
+      sampleCount,
+      wrapperNodes = null,
+      mode = 'batch'
   ) {
 
     return new Promise( (resolve, reject) => {
@@ -60,11 +62,21 @@ class Renderer {
         sampleCount, patch.duration,
         virtualAudioGraph,
         audioContextInstance,
-        noteDelta
+        noteDelta,
+        wrapperNodes,
+        mode
       ).then( graphDefinition => {
 
         try {
           virtualAudioGraph.update( graphDefinition );
+
+          // In streaming mode, connect wrapper nodes to AudioParams
+          if (mode === 'streaming' && wrapperNodes) {
+            this.connectWrapperNodesToGraph(
+              _patch, wrapperNodes, virtualAudioGraph, audioContextInstance
+            );
+          }
+
           resolve( virtualAudioGraph )
         }
         catch (e) {
@@ -257,13 +269,82 @@ class Renderer {
       canvasCtx.setTransform(1, 0, 0, 1, 0, 0);
   }
 
+  /**
+   * Connect wrapper gain nodes to virtual-audio-graph AudioParams in streaming mode
+   *
+   * @param {Object} patch - Audio patch with networkOutputs definitions
+   * @param {Map<number, GainNode>} wrapperNodes - Map of outputIndex → wrapper GainNode
+   * @param {Object} virtualAudioGraph - Virtual audio graph instance
+   * @param {AudioContext} audioContext - Audio context
+   */
+  connectWrapperNodesToGraph(patch, wrapperNodes, virtualAudioGraph, audioContext) {
+    if (ENVIRONMENT_IS_NODE && process.env.LOG_LEVEL === "debug") {
+      console.log('Connecting wrapper nodes to audio graph...');
+    }
+
+    let connectionsCount = 0;
+
+    patch.networkOutputs.forEach((oneOutput, outputIndex) => {
+      // Get the wrapper node for this CPPN output
+      const wrapperNode = wrapperNodes.get(oneOutput.networkOutput);
+
+      if (!wrapperNode) {
+        console.warn(`No wrapper node found for output ${oneOutput.networkOutput}`);
+        return;
+      }
+
+      // Connect this wrapper node to all its target audio graph nodes
+      for (const audioGraphNodeKey in oneOutput.audioGraphNodes) {
+        const connections = oneOutput.audioGraphNodes[audioGraphNodeKey];
+
+        // Get the virtual node from the graph
+        const virtualNode = virtualAudioGraph.virtualNodes[audioGraphNodeKey];
+
+        if (!virtualNode || !virtualNode.audioNode) {
+          console.warn(`Virtual node ${audioGraphNodeKey} not found in graph`);
+          continue;
+        }
+
+        const audioNode = virtualNode.audioNode;
+
+        connections.forEach((connection) => {
+          const paramName = connection.paramName;
+
+          // Skip buffer and curve parameters (handled differently)
+          if (paramName === 'buffer' || paramName === 'curve' ||
+              paramName === 'partialBuffer' || paramName === 'partialGainEnvelope') {
+            console.warn(`Streaming mode does not yet support ${paramName} parameters`);
+            return;
+          }
+
+          // Connect wrapper node to AudioParam
+          if (audioNode[paramName] && audioNode[paramName].constructor.name === 'AudioParam') {
+            wrapperNode.connect(audioNode[paramName]);
+            connectionsCount++;
+
+            if (ENVIRONMENT_IS_NODE && process.env.LOG_LEVEL === "debug") {
+              console.log(`  Connected wrapper ${oneOutput.networkOutput} → ${audioGraphNodeKey}.${paramName}`);
+            }
+          } else {
+            console.warn(`AudioParam ${paramName} not found on node ${audioGraphNodeKey}`);
+          }
+        });
+      }
+    });
+
+    if (ENVIRONMENT_IS_NODE && process.env.LOG_LEVEL === "debug") {
+      console.log(`✅ Connected ${connectionsCount} wrapper nodes to audio graph parameters`);
+    }
+  }
+
 
   async getNodeGraphFromPatch(
-    patch, memberOutputs, sampleCount, duration, virtualAudioGraph, audioContext, noteDelta ) {
+    patch, memberOutputs, sampleCount, duration, virtualAudioGraph, audioContext, noteDelta,
+    wrapperNodes = null, mode = 'batch' ) {
 
     const graph = patch.audioGraph;
     const graphNodeKeysToValueCurves = this.getValueCurvesFromPatch(
-      patch, memberOutputs, sampleCount, audioContext );
+      patch, memberOutputs, sampleCount, audioContext, wrapperNodes, mode );
 
     const {currentTime} = virtualAudioGraph;
 
@@ -411,7 +492,8 @@ class Renderer {
 
     }
     let removeEdgeClicks = true; // TODO
-    if( removeEdgeClicks ) {
+    // Skip edge click removal in streaming mode (uses setTargetAtTime which requires fixed duration)
+    if( removeEdgeClicks && mode !== 'streaming' ) {
       const edgeTimeConstant = 0.015;
       if( graph[0] ) {
         graph[0][1] = 'clickRemoval';
@@ -455,8 +537,15 @@ class Renderer {
     return graph;
   }
 
-  getValueCurvesFromPatch( patch, memberOutputs, sampleCount, audioContext ) {
+  getValueCurvesFromPatch( patch, memberOutputs, sampleCount, audioContext,
+                           wrapperNodes = null, mode = 'batch' ) {
     const graphNodeKeysToValueCurves = new Map();
+
+    // In streaming mode, skip value curve creation (connections handled separately)
+    if (mode === 'streaming' && wrapperNodes) {
+      return graphNodeKeysToValueCurves; // Return empty map
+    }
+
     patch.networkOutputs.forEach( (oneOutput, outputIndex) => {
 
       let samples;
@@ -465,7 +554,7 @@ class Renderer {
       } else {
         const memberOutputsKey = getMemberOutputsKey(
           {index: oneOutput.networkOutput, frequency: oneOutput.frequency} );
-        if( memberOutputs.get(memberOutputsKey) ) {
+        if( memberOutputs && memberOutputs.get(memberOutputsKey) ) {
           samples = memberOutputs.get(memberOutputsKey).samples;
         }
       }
