@@ -271,7 +271,7 @@ class Activator {
                 let _samples;
                 if( antiAliasing ) {
                   _samples = await this.downsampleAndFilterOversampledSignal(
-                    outputSignals[outputIndex], _totalSampleCount, totalSampleCount
+                    outputSignals[outputIndex], _sampleCountToActivate, sampleCountToActivate
                   );
                 } else {
                   _samples = outputSignals[outputIndex];
