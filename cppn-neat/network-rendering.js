@@ -384,6 +384,12 @@ class Renderer {
             }
           } else{
             // Batch mode: use pre-rendered buffers
+            if (!valueCurves) {
+              console.log(`  ⚠️  No value curves for wavetable ${oneAudioGraphNodeKey} - skipping`);
+              delete graph[oneAudioGraphNodeKey];
+              continue;
+            }
+
             const mixWaveSamples = this.getWavetableMixWaveFromPatch(valueCurves);
             const audioWavesSamples = this.getWavetableAudioWavesFromPatch(valueCurves);
 
@@ -414,6 +420,12 @@ class Renderer {
             }
           } else {
             // Batch mode: use pre-rendered buffers
+            if (!valueCurves) {
+              console.log(`  ⚠️  No value curves for additive ${oneAudioGraphNodeKey} - skipping`);
+              delete graph[oneAudioGraphNodeKey];
+              continue;
+            }
+
             const partialBuffers = this.getAdditiveSynthesisPartialBuffersFromPatch(valueCurves);
             const gainEnvelopes = this.getAdditiveSynthesisPartialGainEnvelopeValueCurvesFromPatch(valueCurves);
             const partailGainWeights = this.getPartialGainWeightsFromPatch(patch, oneAudioGraphNodeKey);
