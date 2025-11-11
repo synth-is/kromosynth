@@ -336,7 +336,7 @@ async function streamCPPNChunks(
       false, // reverse
       true, // variationOnPeriods
       velocity,
-      antiAliasing
+      false // antiAliasing (DISABLED: OfflineAudioContext has non-determinism bug)
     );
 
     const elapsedMs = performance.now() - startTime;
