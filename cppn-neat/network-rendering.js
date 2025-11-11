@@ -278,42 +278,121 @@ class Renderer {
    * @param {AudioContext} audioContext - Audio context
    */
   connectWrapperNodesToGraph(patch, wrapperNodes, virtualAudioGraph, audioContext) {
-    if (ENVIRONMENT_IS_NODE && process.env.LOG_LEVEL === "debug") {
-      console.log('Connecting wrapper nodes to audio graph...');
+    if (process.env.LOG_LEVEL === 'debug') {
+      console.log('\n🔌 connectWrapperNodesToGraph() called');
+      console.log(`  patch.networkOutputs: ${patch.networkOutputs.length}`);
+      console.log(`  wrapperNodes: ${wrapperNodes.size}`);
+      console.log(`  virtualAudioGraph.virtualNodes: ${Object.keys(virtualAudioGraph.virtualNodes).length}`);
     }
 
     let connectionsCount = 0;
+    let bypassCount = 0;
 
     patch.networkOutputs.forEach((oneOutput, outputIndex) => {
       // Get the wrapper node for this CPPN output
       const wrapperNode = wrapperNodes.get(oneOutput.networkOutput);
 
+      if (process.env.LOG_LEVEL === 'debug') {
+        console.log(`\n  Processing networkOutput ${oneOutput.networkOutput}:`);
+      }
       if (!wrapperNode) {
-        console.warn(`No wrapper node found for output ${oneOutput.networkOutput}`);
+        if (process.env.LOG_LEVEL === 'debug') {
+          console.warn(`    ✗ No wrapper node found`);
+        }
         return;
+      }
+      if (process.env.LOG_LEVEL === 'debug') {
+        console.log(`    ✓ Wrapper node exists`);
       }
 
       // Connect this wrapper node to all its target audio graph nodes
+      const audioGraphNodeKeys = Object.keys(oneOutput.audioGraphNodes);
+      if (process.env.LOG_LEVEL === 'debug') {
+        console.log(`    Target nodes: ${audioGraphNodeKeys.join(', ')}`);
+      }
+
       for (const audioGraphNodeKey in oneOutput.audioGraphNodes) {
         const connections = oneOutput.audioGraphNodes[audioGraphNodeKey];
+        if (process.env.LOG_LEVEL === 'debug') {
+          console.log(`\n    → ${audioGraphNodeKey}:`);
+        }
 
         // Get the virtual node from the graph
         const virtualNode = virtualAudioGraph.virtualNodes[audioGraphNodeKey];
 
         if (!virtualNode || !virtualNode.audioNode) {
-          console.warn(`Virtual node ${audioGraphNodeKey} not found in graph`);
+          if (process.env.LOG_LEVEL === 'debug') {
+            console.warn(`      ✗ Virtual node not found in graph`);
+          }
           continue;
+        }
+        if (process.env.LOG_LEVEL === 'debug') {
+          console.log(`      ✓ Virtual node exists, type: ${virtualNode.audioNode.constructor.name}`);
         }
 
         const audioNode = virtualNode.audioNode;
 
         connections.forEach((connection) => {
           const paramName = connection.paramName;
+          if (process.env.LOG_LEVEL === 'debug') {
+            console.log(`      Param: ${paramName}`);
+          }
 
-          // Skip buffer and curve parameters (handled differently)
-          if (paramName === 'buffer' || paramName === 'curve' ||
-              paramName === 'partialBuffer' || paramName === 'partialGainEnvelope') {
-            console.warn(`Streaming mode does not yet support ${paramName} parameters`);
+          // Special handling for buffer parameters
+          if (paramName === 'buffer') {
+            // In streaming mode, bypass the bufferSource and connect directly to its outputs
+            if (process.env.LOG_LEVEL === 'debug') {
+              console.log(`        🔄 Buffer param detected - bypassing bufferSource`);
+            }
+
+            // Find the virtual node definition in the graph
+            const graphNodeDef = virtualAudioGraph.virtualNodes[audioGraphNodeKey];
+
+            if (graphNodeDef && graphNodeDef.output) {
+              const outputConnections = Array.isArray(graphNodeDef.output)
+                ? graphNodeDef.output
+                : [graphNodeDef.output];
+
+              if (process.env.LOG_LEVEL === 'debug') {
+                console.log(`          Output connections: ${outputConnections.join(', ')}`);
+              }
+
+              // Connect wrapper directly to each output
+              outputConnections.forEach(targetKey => {
+                if (targetKey === 'output') {
+                  // Direct connection to audio context destination
+                  wrapperNode.connect(audioContext.destination);
+                  connectionsCount++;
+                  bypassCount++;
+                  if (process.env.LOG_LEVEL === 'debug') {
+                    console.log(`          ✅ Connected wrapper → destination`);
+                  }
+                } else {
+                  // Connection to another node
+                  const targetNode = virtualAudioGraph.virtualNodes[targetKey];
+                  if (targetNode && targetNode.audioNode) {
+                    wrapperNode.connect(targetNode.audioNode);
+                    connectionsCount++;
+                    bypassCount++;
+                    if (process.env.LOG_LEVEL === 'debug') {
+                      console.log(`          ✅ Connected wrapper → ${targetKey}`);
+                    }
+                  } else if (process.env.LOG_LEVEL === 'debug') {
+                    console.warn(`          ✗ Target node ${targetKey} not found`);
+                  }
+                }
+              });
+            } else if (process.env.LOG_LEVEL === 'debug') {
+              console.warn(`        ✗ Could not find output connections for ${audioGraphNodeKey}`);
+            }
+            return;
+          }
+
+          // Skip other non-AudioParam parameters
+          if (paramName === 'curve' || paramName === 'partialBuffer' || paramName === 'partialGainEnvelope') {
+            if (process.env.LOG_LEVEL === 'debug') {
+              console.warn(`        ⚠️  Skipping ${paramName} (not supported in streaming)`);
+            }
             return;
           }
 
@@ -321,20 +400,17 @@ class Renderer {
           if (audioNode[paramName] && audioNode[paramName].constructor.name === 'AudioParam') {
             wrapperNode.connect(audioNode[paramName]);
             connectionsCount++;
-
-            if (ENVIRONMENT_IS_NODE && process.env.LOG_LEVEL === "debug") {
-              console.log(`  Connected wrapper ${oneOutput.networkOutput} → ${audioGraphNodeKey}.${paramName}`);
+            if (process.env.LOG_LEVEL === 'debug') {
+              console.log(`        ✅ Connected wrapper → ${audioGraphNodeKey}.${paramName}`);
             }
-          } else {
-            console.warn(`AudioParam ${paramName} not found on node ${audioGraphNodeKey}`);
+          } else if (process.env.LOG_LEVEL === 'debug') {
+            console.warn(`        ✗ AudioParam ${paramName} not found on ${audioGraphNodeKey}`);
           }
         });
       }
     });
 
-    if (ENVIRONMENT_IS_NODE && process.env.LOG_LEVEL === "debug") {
-      console.log(`✅ Connected ${connectionsCount} wrapper nodes to audio graph parameters`);
-    }
+    console.log(`✅ Connected ${connectionsCount} CPPN outputs to audio graph (${bypassCount} via bufferSource bypass)`);
   }
 
 

@@ -176,7 +176,9 @@ export async function renderAudioStreamingHybrid(
   // MANUAL FIX: Virtual-audio-graph doesn't properly handle AudioNode objects
   // passed to custom functions, so we need to manually connect wrapper GainNodes
   // to the virtual-audio-graph's internal nodes
-  console.log('\n🔧 Manually connecting wrapper GainNodes to virtual audio graph...');
+  if (process.env.LOG_LEVEL === 'debug') {
+    console.log('\n🔧 Manually connecting wrapper GainNodes to virtual audio graph...');
+  }
 
   // Get all virtual nodes that need wrapper GainNode inputs
   for (const [networkOutputIndex, wrapperGainNode] of remappedWrapperNodes.entries()) {
@@ -192,12 +194,16 @@ export async function renderAudioStreamingHybrid(
       // For custom function nodes, we need to find their internal sub-nodes
       if (virtualNode && virtualNode.virtualNodes) {
         // This is a custom function with a sub-graph
-        console.log(`  Connecting wrapper ${networkOutputIndex} to custom node ${audioGraphNodeKey} sub-graph`);
+        if (process.env.LOG_LEVEL === 'debug') {
+          console.log(`  Connecting wrapper ${networkOutputIndex} to custom node ${audioGraphNodeKey} sub-graph`);
+        }
 
         // Find the input gain nodes in the sub-graph (they start with 'c')
         for (const [subNodeKey, subNode] of Object.entries(virtualNode.virtualNodes)) {
           if (subNodeKey.startsWith('c') && subNode.audioNode) {
-            console.log(`    → Connecting to sub-node ${subNodeKey}`);
+            if (process.env.LOG_LEVEL === 'debug') {
+              console.log(`    → Connecting to sub-node ${subNodeKey}`);
+            }
             try {
               wrapperGainNode.connect(subNode.audioNode);
             } catch (e) {
@@ -208,35 +214,6 @@ export async function renderAudioStreamingHybrid(
       }
     }
   }
-
-  // Debug: Check if nodes are properly connected to destination
-  console.log('🔍 Checking audio routing to destination...');
-  console.log(`  audioContext.destination: ${audioContext.destination.constructor.name}`);
-  console.log(`  audioContext.destination.channelCount: ${audioContext.destination.channelCount}`);
-
-  // Check what nodes connect to output
-  let outputConnections = 0;
-  for (const [nodeKey, virtualNode] of Object.entries(virtualAudioGraph.virtualNodes)) {
-    if (virtualNode.output && virtualNode.output.includes && virtualNode.output.includes('output')) {
-      console.log(`  Node ${nodeKey} → output`);
-      outputConnections++;
-    }
-  }
-  console.log(`  Total nodes connecting to output: ${outputConnections}`);
-
-  // Check wrapper node connections
-  console.log('\n🔍 Checking wrapper GainNode connections...');
-  for (const [index, gainNode] of wrapperNodes.entries()) {
-    console.log(`  Wrapper ${index}: numberOfOutputs=${gainNode.numberOfOutputs}`);
-  }
-
-  // DEBUG: Connect wrapper 0 directly to destination to test if audio is reaching it
-  console.log('\n🔧 DEBUG: Connecting wrapper 0 DIRECTLY to destination (bypassing virtual-audio-graph)...');
-  const testGain = audioContext.createGain();
-  testGain.gain.value = 0.5;
-  wrapperNodes.get(0).connect(testGain);
-  testGain.connect(audioContext.destination);
-  console.log('  Test connection made: wrapper[0] → testGain → destination');
 
   console.log('');
 

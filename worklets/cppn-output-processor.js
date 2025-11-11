@@ -114,12 +114,12 @@ class CPPNOutputProcessor extends AudioWorkletProcessor {
         return false; // Stop processing
       }
 
-      // If still buffering, output silence
+      // If still buffering, output silence (but DON'T increment counters)
       if (this.isBuffering) {
         for (let channel = 0; channel < channelCount; channel++) {
           output[channel][i] = 0;
         }
-        this.totalSamplesProcessed++;
+        // Don't increment totalSamplesProcessed - time "pauses" during buffering
         continue;
       }
 
