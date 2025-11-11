@@ -322,7 +322,6 @@ async function streamCPPNChunks(
     );
 
     console.log(`Generating CPPN chunk ${chunkIndex + 1}/${numChunks}...`);
-    console.log(`  Parameters: totalSamples=${totalSamples}, sampleCountToActivate=${sampleCountToActivate}, sampleOffset=${sampleOffset}`);
     const startTime = performance.now();
 
     // Activate CPPN for this chunk
@@ -351,13 +350,6 @@ async function streamCPPNChunks(
     for (const [outputIndex, outputData] of memberOutputs.entries()) {
       let samples = outputData.samples;
 
-      // WORKAROUND: activator sometimes returns full-duration arrays instead of chunks
-      // Slice to the correct chunk size
-      if (samples && samples.length > sampleCountToActivate) {
-        console.warn(`  ⚠️  CPPN output has ${samples.length} samples, expected ${sampleCountToActivate}. Slicing to chunk size.`);
-        samples = samples.slice(0, sampleCountToActivate);
-      }
-
       // Remove DC offset to prevent low frequency artifacts
       if (samples && samples.length > 0) {
         const mean = samples.reduce((sum, s) => sum + s, 0) / samples.length;
@@ -370,40 +362,23 @@ async function streamCPPNChunks(
       sequentialIndex++;
     }
 
-    // Debug: Check if CPPN chunks contain actual audio data (after slicing)
-    if (chunkIndex === 0 || chunkIndex === 1) {
-      console.log(`  🔍 Checking CPPN chunk ${chunkIndex} data (after slicing)...`);
-      if (chunkIndex === 0) {
-        console.log(`  memberOutputs keys: ${Array.from(memberOutputs.keys()).join(', ')}`);
-      }
+    // Debug: Check first CPPN chunk data quality
+    if (chunkIndex === 0 && process.env.LOG_LEVEL === 'debug') {
+      console.log(`  🔍 Checking CPPN chunk ${chunkIndex} data...`);
+      console.log(`  memberOutputs keys: ${Array.from(memberOutputs.keys()).join(', ')}`);
 
-      // Check the first sliced output
       const firstKey = Object.keys(outputsObject)[0];
       const samples = outputsObject[firstKey];
 
       if (samples) {
         console.log(`  samples.length: ${samples.length}`);
 
-        // Check first few samples
         let max = 0;
-        for (let i = 0; i < Math.min(100, samples.length); i++) {
+        for (let i = 0; i < samples.length; i++) {
           if (Math.abs(samples[i]) > max) max = Math.abs(samples[i]);
         }
-        const rms = Math.sqrt(samples.slice(0, 100).reduce((sum, s) => sum + s*s, 0) / 100);
-        console.log(`  📊 First 100 samples: max=${max.toFixed(4)}, rms=${rms.toFixed(4)}`);
-
-        // Check last few samples (chunk boundary)
-        let maxEnd = 0;
-        const endStart = Math.max(0, samples.length - 100);
-        for (let i = endStart; i < samples.length; i++) {
-          if (Math.abs(samples[i]) > maxEnd) maxEnd = Math.abs(samples[i]);
-        }
-        const rmsEnd = Math.sqrt(samples.slice(endStart).reduce((sum, s) => sum + s*s, 0) / 100);
-        console.log(`  📊 Last 100 samples: max=${maxEnd.toFixed(4)}, rms=${rmsEnd.toFixed(4)}`);
-
-        // Check for DC offset
-        const mean = samples.reduce((sum, s) => sum + s, 0) / samples.length;
-        console.log(`  📊 DC offset (mean): ${mean.toFixed(6)}`);
+        const rms = Math.sqrt(samples.reduce((sum, s) => sum + s*s, 0) / samples.length);
+        console.log(`  📊 Stats: max=${max.toFixed(4)}, rms=${rms.toFixed(4)}`);
       }
     }
 
