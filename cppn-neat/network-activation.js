@@ -9,6 +9,14 @@ import {GPU} from 'gpu.js';
 
 const ENVIRONMENT_IS_NODE = typeof process==="object"&&typeof process.versions==="object"&&typeof process.versions.node==="string";
 
+// Import OfflineAudioContext for anti-aliasing downsampling
+// Safe to use in streaming mode because it operates on isolated chunks, not the main timeline
+let OfflineAudioContext;
+if (ENVIRONMENT_IS_NODE) {
+  const NodeWebAudioAPI = await import('node-web-audio-api');
+  OfflineAudioContext = NodeWebAudioAPI.OfflineAudioContext;
+}
+
 // import NetworkActivationGPUWorker from "../workers/network-activation-gpu-worker.js?worker";
 
 /**

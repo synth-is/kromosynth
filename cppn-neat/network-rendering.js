@@ -1178,7 +1178,7 @@ class Renderer {
     });
     // Fill remaining with constant curves if fewer envelopes than partials
     for (let i = gainEnvelopeWrapperNodeKeys.length; i < partialWrapperNodeKeys.length; i++) {
-      additiveNodeFunctionParameters[`gainValueCurve${index + 1}`] = constantGainCurve;
+      additiveNodeFunctionParameters[`gainValueCurve${i + 1}`] = constantGainCurve;
     }
 
     // Add gain weights
