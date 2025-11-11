@@ -348,17 +348,9 @@ class Renderer {
 
     const {currentTime} = virtualAudioGraph;
 
-    // In streaming mode, add wrapper nodes to the graph first so they can be referenced
-    if (mode === 'streaming' && wrapperNodes) {
-      console.log(`Adding ${wrapperNodes.size} wrapper nodes to graph for referencing`);
-      for (const [outputIndex, gainNode] of wrapperNodes.entries()) {
-        // Add wrapper node as a virtual node that wraps the real AudioNode
-        const wrapperKey = `cppn_output_${outputIndex}`;
-        // Use 'gain' node type with the actual GainNode
-        graph[wrapperKey] = ['gain', [], {gain: 1.0}];
-        // We'll manually connect the actual gainNode after graph creation
-      }
-    }
+    // In streaming mode, wrapper nodes are passed directly as AudioNode objects
+    // to custom node functions - they don't need to be in the virtual graph
+    // (Adding them as virtual nodes would create NEW silent gain nodes)
 
     // const wavetableGraphNodeEntryPromises = [];
     for( const oneAudioGraphNodeKey in graph ) {
@@ -540,7 +532,7 @@ class Renderer {
           if( ! graph[audioNodeKey] ) {
             console.log("graph[audioNodeKey]", audioNodeKey, graph);
           }
-          graph[audioNodeKey][1].map( conn =>
+          graph[audioNodeKey][1] = graph[audioNodeKey][1].map( conn =>
             conn === 'output' ? 'clickRemoval' : conn
           );
         }
@@ -570,6 +562,20 @@ class Renderer {
       //     threshold: -50
       // }];
     }
+
+    // Debug: Log graph structure in streaming mode
+    if (mode === 'streaming' && ENVIRONMENT_IS_NODE) {
+      console.log('\n🔍 Graph structure in streaming mode:');
+      for (const nodeKey in graph) {
+        const node = graph[nodeKey];
+        if (node && Array.isArray(node)) {
+          const [type, connections, params] = node;
+          console.log(`  ${nodeKey}: ${type} → [${Array.isArray(connections) ? connections.join(', ') : connections}]`);
+        }
+      }
+      console.log('');
+    }
+
     return graph;
   }
 
@@ -1021,8 +1027,8 @@ class Renderer {
     audioGraphNodeKey, outputKeys, patch, wrapperNodes, currentTime, duration
   ) {
     // Find all CPPN outputs that connect to this wavetable node with buffer parameter
-    const audioWaveWrapperNodeKeys = [];
-    let mixWaveWrapperNodeKey = null;
+    const audioWaveWrapperGainNodes = []; // Store actual GainNode objects, not keys
+    let mixWaveWrapperGainNode = null;
 
     patch.networkOutputs.forEach((oneOutput) => {
       const connections = oneOutput.audioGraphNodes[audioGraphNodeKey];
@@ -1033,7 +1039,7 @@ class Renderer {
           // This is an audio wave for the wavetable
           const wrapperNode = wrapperNodes.get(oneOutput.networkOutput);
           if (wrapperNode) {
-            audioWaveWrapperNodeKeys.push(`cppn_output_${oneOutput.networkOutput}`);
+            audioWaveWrapperGainNodes.push(wrapperNode); // Pass the actual GainNode object
           } else {
             console.warn(`No wrapper node found for output ${oneOutput.networkOutput} (wavetable buffer)`);
           }
@@ -1041,7 +1047,7 @@ class Renderer {
           // This is the mix control wave
           const wrapperNode = wrapperNodes.get(oneOutput.networkOutput);
           if (wrapperNode) {
-            mixWaveWrapperNodeKey = `cppn_output_${oneOutput.networkOutput}`;
+            mixWaveWrapperGainNode = wrapperNode; // Pass the actual GainNode object
           } else {
             console.warn(`No wrapper node found for output ${oneOutput.networkOutput} (wavetable mix)`);
           }
@@ -1049,32 +1055,32 @@ class Renderer {
       });
     });
 
-    if (audioWaveWrapperNodeKeys.length === 0) {
+    if (audioWaveWrapperGainNodes.length === 0) {
       console.warn(`No audio wave wrapper nodes found for wavetable ${audioGraphNodeKey}`);
       return null;
     }
 
     // Create wavetable node function for streaming mode
     const wavetableStreaming = this.getWavetableAudioNodeFunctionStreaming(
-      audioWaveWrapperNodeKeys.length
+      audioWaveWrapperGainNodes.length
     );
 
     const wavetableNodeFunctionParameters = {
-      numberOfAudiowaves: audioWaveWrapperNodeKeys.length,
+      numberOfAudiowaves: audioWaveWrapperGainNodes.length,
       currentTime,
       duration
     };
 
-    // Add wrapper node keys as parameters (they're already in the graph)
-    audioWaveWrapperNodeKeys.forEach((key, index) => {
-      wavetableNodeFunctionParameters[`audioWaveKey${index + 1}`] = key;
+    // Pass actual GainNode objects as parameters (not keys!)
+    audioWaveWrapperGainNodes.forEach((gainNode, index) => {
+      wavetableNodeFunctionParameters[`audioWave${index + 1}`] = gainNode;
     });
 
     // Mix control is handled differently in streaming mode
     // For now, we'll use equal gain for all waves (TODO: implement mix control)
     // In streaming mode, use constant gain (no setValueCurveAtTime on real-time context)
-    audioWaveWrapperNodeKeys.forEach((_, index) => {
-      wavetableNodeFunctionParameters[`gainValue${index + 1}`] = 1.0 / audioWaveWrapperNodeKeys.length;
+    audioWaveWrapperGainNodes.forEach((_, index) => {
+      wavetableNodeFunctionParameters[`gainValue${index + 1}`] = 1.0 / audioWaveWrapperGainNodes.length;
     });
 
     const wavetableNodeEntry = [wavetableStreaming, outputKeys, wavetableNodeFunctionParameters];
@@ -1083,7 +1089,7 @@ class Renderer {
 
   /**
    * Create wavetable audio node function for streaming mode
-   * Uses wrapper GainNodes by referencing their keys in the graph
+   * Uses wrapper GainNodes as direct AudioNode input connections
    */
   getWavetableAudioNodeFunctionStreaming(numberOfAudiowaves) {
     const functionParams = ['numberOfAudiowaves', 'currentTime', 'duration'];
@@ -1093,22 +1099,26 @@ class Renderer {
 
     for (let i = 1; i <= numberOfAudiowaves; i++) {
       const oneGainValueKey = `gainValue${i}`;
-      const oneAudioWaveKeyParam = `audioWaveKey${i}`;
+      const oneAudioWaveParam = `audioWave${i}`; // Now receives AudioNode, not key string
       functionParams.push(oneGainValueKey);
-      functionParams.push(oneAudioWaveKeyParam);
+      functionParams.push(oneAudioWaveParam);
 
       // In streaming mode, use constant gain (no setValueCurveAtTime on real-time context)
       wavetableNodeDefinition.push(
         `g${i}: ['gain', 'zero', {gain: ${oneGainValueKey}}]`
       );
-      // Connect from the wrapper node (by key) to the gain
+      // Connect from the wrapper GainNode (passed as AudioNode object) to the gain
       wavetableNodeDefinition.push(
-        `c${i}: ['gain', 'g${i}', {gain: 1.0}, ${oneAudioWaveKeyParam}]`
+        `c${i}: ['gain', 'g${i}', {gain: 1.0}, ${oneAudioWaveParam}]`
       );
     }
 
     const functionBody = `
       const { ${functionParams.join(',')} } = params;
+      // Debug: Log if we're receiving AudioNode objects
+      if (typeof console !== 'undefined' && numberOfAudiowaves >= 1 && audioWave1) {
+        console.log('Wavetable function received audioWave1:', audioWave1.constructor ? audioWave1.constructor.name : typeof audioWave1);
+      }
       return { ${wavetableNodeDefinition.join(',')} };
     `;
 
@@ -1131,8 +1141,8 @@ class Renderer {
     outputKeys, patch, audioGraphNodeKey, wrapperNodes, currentTime, duration
   ) {
     // Find all CPPN outputs that connect to this additive node
-    const partialWrapperNodeKeys = [];
-    const gainEnvelopeWrapperNodeKeys = [];
+    const partialWrapperGainNodes = []; // Store actual GainNode objects, not keys
+    const gainEnvelopeWrapperGainNodes = [];
     const partialGainWeights = [];
 
     patch.networkOutputs.forEach((oneOutput) => {
@@ -1144,7 +1154,7 @@ class Renderer {
           // This is a partial/harmonic audio wave
           const wrapperNode = wrapperNodes.get(oneOutput.networkOutput);
           if (wrapperNode) {
-            partialWrapperNodeKeys.push(`cppn_output_${oneOutput.networkOutput}`);
+            partialWrapperGainNodes.push(wrapperNode); // Pass the actual GainNode object
           } else {
             console.warn(`No wrapper node found for output ${oneOutput.networkOutput} (partial buffer)`);
           }
@@ -1152,7 +1162,7 @@ class Renderer {
           // This is a gain envelope for a partial
           const wrapperNode = wrapperNodes.get(oneOutput.networkOutput);
           if (wrapperNode) {
-            gainEnvelopeWrapperNodeKeys.push(`cppn_output_${oneOutput.networkOutput}`);
+            gainEnvelopeWrapperGainNodes.push(wrapperNode); // Pass the actual GainNode object
           } else {
             console.warn(`No wrapper node found for output ${oneOutput.networkOutput} (gain envelope)`);
           }
@@ -1161,35 +1171,35 @@ class Renderer {
       });
     });
 
-    if (partialWrapperNodeKeys.length === 0) {
+    if (partialWrapperGainNodes.length === 0) {
       console.warn(`No partial wrapper nodes found for additive node ${audioGraphNodeKey}`);
       return null;
     }
 
     // Create additive node function for streaming mode
     const additiveStreaming = this.getAdditiveSynthesisAudioNodeFunctionStreaming(
-      partialWrapperNodeKeys.length
+      partialWrapperGainNodes.length
     );
 
     const additiveNodeFunctionParameters = {
-      numberOfPartialBufferAndGainValuePairs: partialWrapperNodeKeys.length,
+      numberOfPartialBufferAndGainValuePairs: partialWrapperGainNodes.length,
       currentTime,
       duration
     };
 
-    // Add wrapper node keys as parameters (they're already in the graph)
-    partialWrapperNodeKeys.forEach((key, index) => {
-      additiveNodeFunctionParameters[`audioWaveKey${index + 1}`] = key;
+    // Pass actual GainNode objects as parameters (not keys!)
+    partialWrapperGainNodes.forEach((gainNode, index) => {
+      additiveNodeFunctionParameters[`audioWave${index + 1}`] = gainNode;
     });
 
     // Add gain envelope wrapper node keys (or use constant gain if not present)
     const constantGainCurve = new Float32Array(48000).fill(1.0);
-    gainEnvelopeWrapperNodeKeys.forEach((key, index) => {
+    gainEnvelopeWrapperGainNodes.forEach((gainNode, index) => {
       // TODO: For now, using constant gain - need to connect envelope wrapper nodes
       additiveNodeFunctionParameters[`gainValueCurve${index + 1}`] = constantGainCurve;
     });
     // Fill remaining with constant curves if fewer envelopes than partials
-    for (let i = gainEnvelopeWrapperNodeKeys.length; i < partialWrapperNodeKeys.length; i++) {
+    for (let i = gainEnvelopeWrapperGainNodes.length; i < partialWrapperGainNodes.length; i++) {
       additiveNodeFunctionParameters[`gainValueCurve${i + 1}`] = constantGainCurve;
     }
 
@@ -1198,7 +1208,7 @@ class Renderer {
       additiveNodeFunctionParameters[`gainWeight${index + 1}`] = weight;
     });
     // Fill remaining with weight 1 if needed
-    for (let i = partialGainWeights.length; i < partialWrapperNodeKeys.length; i++) {
+    for (let i = partialGainWeights.length; i < partialWrapperGainNodes.length; i++) {
       additiveNodeFunctionParameters[`gainWeight${i + 1}`] = 1;
     }
 
@@ -1208,7 +1218,7 @@ class Renderer {
 
   /**
    * Create additive synthesis audio node function for streaming mode
-   * Uses wrapper GainNodes by referencing their keys in the graph
+   * Uses wrapper GainNodes as direct AudioNode input connections
    */
   getAdditiveSynthesisAudioNodeFunctionStreaming(numberOfPartialBufferAndGainValuePairs) {
     const functionParams = ['numberOfPartialBufferAndGainValuePairs', 'currentTime', 'duration'];
@@ -1217,10 +1227,10 @@ class Renderer {
     ];
 
     for (let i = 1; i <= numberOfPartialBufferAndGainValuePairs; i++) {
-      const oneAudioWaveKeyParam = `audioWaveKey${i}`;
+      const oneAudioWaveParam = `audioWave${i}`; // Now receives AudioNode, not key string
       const oneGainValueCurveKey = `gainValueCurve${i}`;
       const oneGainWeightKey = `gainWeight${i}`;
-      functionParams.push(oneAudioWaveKeyParam);
+      functionParams.push(oneAudioWaveParam);
       functionParams.push(oneGainValueCurveKey);
       functionParams.push(oneGainWeightKey);
 
@@ -1238,14 +1248,18 @@ class Renderer {
       additiveNodeDefinition.push(
         `gainValueCurve${i}: ['gain', 'gainWeight${i}', {gain: 1.0}]`
       );
-      // Connect from the wrapper node (by key) to the gain
+      // Connect from the wrapper GainNode (passed as AudioNode object) to the gain
       additiveNodeDefinition.push(
-        `c${i}: ['gain', 'gainValueCurve${i}', {gain: 1.0}, ${oneAudioWaveKeyParam}]`
+        `c${i}: ['gain', 'gainValueCurve${i}', {gain: 1.0}, ${oneAudioWaveParam}]`
       );
     }
 
     const functionBody = `
       const { ${functionParams.join(',')} } = params;
+      // Debug: Log if we're receiving AudioNode objects
+      if (typeof console !== 'undefined' && numberOfPartialBufferAndGainValuePairs >= 1 && audioWave1) {
+        console.log('Additive function received audioWave1:', audioWave1.constructor ? audioWave1.constructor.name : typeof audioWave1);
+      }
       return { ${additiveNodeDefinition.join(',')} };
     `;
 

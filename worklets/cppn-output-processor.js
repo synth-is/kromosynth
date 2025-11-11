@@ -38,6 +38,9 @@ class CPPNOutputProcessor extends AudioWorkletProcessor {
     this.isBuffering = true;
     this.minBufferedChunks = 2; // Minimum chunks to buffer before starting
 
+    // Debug state
+    this.hasLoggedFirstOutput = false;
+
     // Listen for CPPN chunks from main thread
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
@@ -92,6 +95,14 @@ class CPPNOutputProcessor extends AudioWorkletProcessor {
     // ... etc
     const channelCount = output.length;
 
+    // Debug: Log first process call
+    if (this.totalSamplesProcessed === 0) {
+      this.port.postMessage({
+        type: 'debug',
+        message: `First process() call: channelCount=${channelCount}, buffering=${this.isBuffering}, chunks=${this.cppnChunks.size}`
+      });
+    }
+
     // Process 128 samples (quantum size)
     for (let i = 0; i < 128; i++) {
       // Check if we've reached the end
@@ -127,6 +138,15 @@ class CPPNOutputProcessor extends AudioWorkletProcessor {
         for (let channel = 0; channel < channelCount; channel++) {
           const cppnOutputIndex = channel.toString();
           output[channel][i] = cppnValues[cppnOutputIndex] || 0;
+        }
+
+        // Debug: Log first actual output samples (after buffering stops)
+        if (!this.hasLoggedFirstOutput) {
+          this.port.postMessage({
+            type: 'debug',
+            message: `First real output! Sample ${this.totalSamplesProcessed}: output[0]=${(cppnValues['0'] || 0).toFixed(4)}, keys=${Object.keys(cppnValues).slice(0, 3).join(',')}`
+          });
+          this.hasLoggedFirstOutput = true;
         }
       }
 

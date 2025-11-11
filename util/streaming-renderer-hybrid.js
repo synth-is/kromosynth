@@ -173,6 +173,73 @@ export async function renderAudioStreamingHybrid(
 
   console.log('✅ DSP audio graph wired up with wrapper nodes');
 
+  // MANUAL FIX: Virtual-audio-graph doesn't properly handle AudioNode objects
+  // passed to custom functions, so we need to manually connect wrapper GainNodes
+  // to the virtual-audio-graph's internal nodes
+  console.log('\n🔧 Manually connecting wrapper GainNodes to virtual audio graph...');
+
+  // Get all virtual nodes that need wrapper GainNode inputs
+  for (const [networkOutputIndex, wrapperGainNode] of remappedWrapperNodes.entries()) {
+    const connections = synthIsPatch.networkOutputs.find(
+      o => o.networkOutput === networkOutputIndex
+    );
+
+    if (!connections || !connections.audioGraphNodes) continue;
+
+    for (const [audioGraphNodeKey, connectionArray] of Object.entries(connections.audioGraphNodes)) {
+      const virtualNode = virtualAudioGraph.virtualNodes[audioGraphNodeKey];
+
+      // For custom function nodes, we need to find their internal sub-nodes
+      if (virtualNode && virtualNode.virtualNodes) {
+        // This is a custom function with a sub-graph
+        console.log(`  Connecting wrapper ${networkOutputIndex} to custom node ${audioGraphNodeKey} sub-graph`);
+
+        // Find the input gain nodes in the sub-graph (they start with 'c')
+        for (const [subNodeKey, subNode] of Object.entries(virtualNode.virtualNodes)) {
+          if (subNodeKey.startsWith('c') && subNode.audioNode) {
+            console.log(`    → Connecting to sub-node ${subNodeKey}`);
+            try {
+              wrapperGainNode.connect(subNode.audioNode);
+            } catch (e) {
+              console.warn(`    ✗ Failed to connect: ${e.message}`);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Debug: Check if nodes are properly connected to destination
+  console.log('🔍 Checking audio routing to destination...');
+  console.log(`  audioContext.destination: ${audioContext.destination.constructor.name}`);
+  console.log(`  audioContext.destination.channelCount: ${audioContext.destination.channelCount}`);
+
+  // Check what nodes connect to output
+  let outputConnections = 0;
+  for (const [nodeKey, virtualNode] of Object.entries(virtualAudioGraph.virtualNodes)) {
+    if (virtualNode.output && virtualNode.output.includes && virtualNode.output.includes('output')) {
+      console.log(`  Node ${nodeKey} → output`);
+      outputConnections++;
+    }
+  }
+  console.log(`  Total nodes connecting to output: ${outputConnections}`);
+
+  // Check wrapper node connections
+  console.log('\n🔍 Checking wrapper GainNode connections...');
+  for (const [index, gainNode] of wrapperNodes.entries()) {
+    console.log(`  Wrapper ${index}: numberOfOutputs=${gainNode.numberOfOutputs}`);
+  }
+
+  // DEBUG: Connect wrapper 0 directly to destination to test if audio is reaching it
+  console.log('\n🔧 DEBUG: Connecting wrapper 0 DIRECTLY to destination (bypassing virtual-audio-graph)...');
+  const testGain = audioContext.createGain();
+  testGain.gain.value = 0.5;
+  wrapperNodes.get(0).connect(testGain);
+  testGain.connect(audioContext.destination);
+  console.log('  Test connection made: wrapper[0] → testGain → destination');
+
+  console.log('');
+
   // Generate and stream CPPN chunks
   streamCPPNChunks(
     cppnOutputNode,
@@ -236,6 +303,10 @@ function setupMessageHandling(workletNode) {
       case 'underrun':
         console.error(`Audio underrun at sample ${data.sample}`);
         break;
+
+      case 'debug':
+        console.log(`[AudioWorklet] ${data.message}`);
+        break;
     }
   };
 }
@@ -295,9 +366,37 @@ async function streamCPPNChunks(
     console.log(`  Generated in ${elapsedMs.toFixed(1)}ms`);
 
     // Convert Map to object for transfer
+    // IMPORTANT: Map keys to sequential indices for AudioWorklet
+    // memberOutputs uses complex keys like "7_466.16" but AudioWorklet expects "0", "1", "2"...
     const outputsObject = {};
+    let sequentialIndex = 0;
     for (const [outputIndex, outputData] of memberOutputs.entries()) {
-      outputsObject[outputIndex] = outputData.samples;
+      outputsObject[sequentialIndex.toString()] = outputData.samples;
+      sequentialIndex++;
+    }
+
+    // Debug: Check if CPPN chunks contain actual audio data
+    if (chunkIndex === 0) {
+      console.log(`  🔍 Checking CPPN chunk data...`);
+      console.log(`  memberOutputs size: ${memberOutputs.size}`);
+      console.log(`  memberOutputs keys: ${Array.from(memberOutputs.keys()).join(', ')}`);
+
+      // Get the first output (whatever key it has)
+      const firstKey = Array.from(memberOutputs.keys())[0];
+      const firstOutput = memberOutputs.get(firstKey);
+      console.log(`  First output key: ${firstKey}, exists: ${!!firstOutput}`);
+
+      if (firstOutput && firstOutput.samples) {
+        const samples = firstOutput.samples;
+        console.log(`  samples.length: ${samples.length}`);
+        // Avoid spread operator for large arrays
+        let max = 0;
+        for (let i = 0; i < Math.min(100, samples.length); i++) {
+          if (Math.abs(samples[i]) > max) max = Math.abs(samples[i]);
+        }
+        const rms = Math.sqrt(samples.slice(0, 100).reduce((sum, s) => sum + s*s, 0) / 100);
+        console.log(`  📊 CPPN output ${firstKey} stats (first 100 samples): max=${max.toFixed(4)}, rms=${rms.toFixed(4)}`);
+      }
     }
 
     // Send chunk to AudioWorklet
