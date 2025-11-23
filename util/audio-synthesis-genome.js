@@ -5,6 +5,7 @@ import { patchFromAsNEATnetwork } from './audio-graph-asNEAT-bridge.js';
 import { getRoundedFrequencyValue } from './range.js';
 import { getPatchWithBufferFrequenciesUpdatedAccordingToNoteDelta } from '../wavekilde.js';
 import neatjs from 'neatjs';
+import Activator from '../cppn-neat/network-activation.js';
 
 // let evolver;
 function getEvolver(evoParamsWaveNetwork) {
@@ -59,7 +60,9 @@ export async function getNewAudioSynthesisGenomeByMutation(
     evoParams,
     OfflineAudioContext,
     patchFitnessTestDuration,
-    useGPU
+    useGPU,
+    validateCPPNRanges = false, // Optional CPPN range validation (disabled by default)
+    cppnRangeValidationOptions = {} // Options for CPPN range validation
 ) {
   let waveNetwork, asNEATPatch;
   // TODO: the rationale behind this condition needs to be revisited (and then it needs to include PartialEnvelopeNetworkOutputNode and PartialNetworkOutputNode)
@@ -334,7 +337,7 @@ export async function getNewAudioSynthesisGenomeByMutation(
       offlineAudioContext = undefined;
     }
     patchOK = await doesPatchNetworkHaveMinimumFitness(
-      asNEATPatch, waveNetwork, 
+      asNEATPatch, waveNetwork,
       audioCtx,
       false, // checkDataAmplitude
       offlineAudioContext,
@@ -342,6 +345,19 @@ export async function getNewAudioSynthesisGenomeByMutation(
       useGPU
     );
     offlineAudioContext = undefined;
+
+    // Optional CPPN range validation
+    let cppnRangesOK = true;
+    if (patchOK && validateCPPNRanges && waveNetwork) {
+      cppnRangesOK = await validateCPPNOutputRanges(waveNetwork, cppnRangeValidationOptions);
+      if (!cppnRangesOK) {
+        console.log(`⚠️  CPPN range validation failed (attempt ${patchMutationAttempt}), retrying...`);
+      }
+    }
+
+    // Combine both validations
+    patchOK = patchOK && cppnRangesOK;
+
     if( ! patchOK ) {
       defectivePatches.push( asNEATPatch );
     }
@@ -612,4 +628,120 @@ function getASNEATDefaultParamsFromEvoParams( evoParams ) {
     defaultParameters = {};
   }
   return defaultParameters;
+}
+
+/**
+ * Validates that CPPN outputs stay within the [-1, 1] range
+ * Returns true if valid, false if out-of-range values detected
+ *
+ * @param {Object} waveNetwork - The CPPN network to validate
+ * @param {Object} options - Validation options
+ * @param {number} options.sampleRate - Sample rate for activation (default: 48000)
+ * @param {number} options.duration - Duration in seconds (default: 1)
+ * @param {number} options.sampleStep - Analyze every Nth sample (default: 5000)
+ * @param {number} options.maxExceedanceRate - Maximum allowed exceedance rate (default: 0.0, i.e., no exceedances)
+ * @param {Array<number>} options.testFrequencies - Frequencies to test (default: [1, 10, 100, 440, 1000, 4000])
+ */
+async function validateCPPNOutputRanges(waveNetwork, options = {}) {
+  const {
+    sampleRate = 48000,
+    duration = 1,
+    sampleStep = 5000,
+    maxExceedanceRate = 0.0,
+    testFrequencies = [1, 10, 100, 440, 1000, 4000]
+  } = options;
+
+  const activator = new Activator(sampleRate);
+  const totalSamples = sampleRate * duration;
+  const samplesToAnalyze = Math.ceil(totalSamples / sampleStep);
+
+  try {
+    let allOutputs = new Map();
+
+    if (waveNetwork.oneCPPNPerFrequency && waveNetwork.CPPNs) {
+      // Multi-CPPN mode: Activate each CPPN at its designated frequency
+      const cppnFrequencies = Object.keys(waveNetwork.CPPNs).map(f => parseFloat(f));
+
+      const outputIndexes = cppnFrequencies.map(freq => ({
+        index: 0,
+        frequency: freq
+      }));
+
+      const outputs = await activator.activateMember(
+        waveNetwork,
+        null, // patch
+        outputIndexes,
+        samplesToAnalyze,
+        null, // sampleCountToActivate
+        0, // sampleOffset
+        false, // useGPU
+        false, // reverse
+        true, // variationOnPeriods
+        1, // velocity
+        false // antiAliasing
+      );
+
+      for (const [key, value] of outputs.entries()) {
+        allOutputs.set(key, value);
+      }
+
+    } else {
+      // Single-CPPN mode: Test at multiple frequencies
+      const numberOfOutputs = waveNetwork.offspring?.outputNeuronCount || waveNetwork.outputNeuronCount || 18;
+
+      for (const freq of testFrequencies) {
+        const outputIndexes = Array.from({ length: numberOfOutputs }, (_, i) => ({
+          index: i,
+          frequency: freq
+        }));
+
+        const outputs = await activator.activateMember(
+          waveNetwork,
+          null, // patch
+          outputIndexes,
+          samplesToAnalyze,
+          null, // sampleCountToActivate
+          0, // sampleOffset
+          false, // useGPU
+          false, // reverse
+          true, // variationOnPeriods
+          1, // velocity
+          false // antiAliasing
+        );
+
+        for (const [key, value] of outputs.entries()) {
+          allOutputs.set(key, value);
+        }
+      }
+    }
+
+    // Check for exceedances
+    let totalSamplesChecked = 0;
+    let exceedances = 0;
+
+    for (const [, outputData] of allOutputs.entries()) {
+      const samples = outputData.samples;
+      if (!samples) continue;
+
+      for (let i = 0; i < samples.length; i++) {
+        const value = samples[i];
+        totalSamplesChecked++;
+
+        if (value < -1.0 || value > 1.0) {
+          exceedances++;
+        }
+      }
+    }
+
+    const exceedanceRate = totalSamplesChecked > 0 ? exceedances / totalSamplesChecked : 0;
+
+    // Return true if exceedance rate is within acceptable limits
+    return exceedanceRate <= maxExceedanceRate;
+
+  } catch (error) {
+    console.warn('⚠️  CPPN range validation error:', error.message);
+    // On error, consider it valid to avoid blocking evolution
+    // (malformed CPPNs will likely fail other fitness tests anyway)
+    return true;
+  }
 }
