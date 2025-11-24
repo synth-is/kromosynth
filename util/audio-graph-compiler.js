@@ -8,11 +8,39 @@
  * being compatible with the latest virtual-audio-graph that supports AudioWorklets.
  */
 
-import vagImport from 'virtual-audio-graph';
+// Import both default and all named exports
+import createVirtualAudioGraphImport, * as vagNodes from 'virtual-audio-graph';
 
-// Handle CJS/ESM interop - default export might be wrapped
-const createVirtualAudioGraph = vagImport.default || vagImport;
-const vagNodes = vagImport;
+// Handle CJS/ESM interop - sometimes default is wrapped
+const createVirtualAudioGraph = createVirtualAudioGraphImport?.default || createVirtualAudioGraphImport;
+
+// Detect environment
+const IS_BROWSER = typeof window !== 'undefined' && typeof window.AudioContext !== 'undefined';
+
+/**
+ * Custom channelMerger factory that properly handles numberOfInputs parameter
+ *
+ * In browsers, the Web Audio API requires numberOfInputs to be set via the constructor,
+ * and setting it as a property causes an error. However, node-web-audio-api is more
+ * permissive and allows it. This function handles both environments correctly.
+ */
+function createCustomChannelMerger(output, params = {}) {
+  if (IS_BROWSER) {
+    // Browser: strip out numberOfInputs to avoid "Cannot set property" error
+    const { numberOfInputs, ...safeParams } = params;
+
+    // Log warning if numberOfInputs is non-standard
+    if (numberOfInputs && numberOfInputs !== 6) {
+      console.warn(`channelMerger numberOfInputs=${numberOfInputs} ignored in browser (using default=6)`);
+    }
+
+    // Use the standard channelMerger but without the problematic numberOfInputs parameter
+    return vagNodes.channelMerger(output, safeParams);
+  } else {
+    // Node.js with node-web-audio-api: pass through all params (works fine)
+    return vagNodes.channelMerger(output, params);
+  }
+}
 
 /**
  * Compile an array-based audio graph to function-based format
@@ -71,8 +99,15 @@ export function compileAudioGraph(arrayBasedGraph, customNodes = {}) {
       continue;
     }
 
-    // Check custom nodes first (for wavetable, additive, feedbackDelay, etc.)
-    const nodeFactory = customNodes[nodeType] || vagNodes[nodeType];
+    // Check custom nodes first (for wavetable, additive, feedbackDelay, channelMerger, etc.)
+    let nodeFactory = customNodes[nodeType];
+
+    // Use custom channelMerger for browser compatibility
+    if (!nodeFactory && nodeType === 'channelMerger') {
+      nodeFactory = createCustomChannelMerger;
+    } else if (!nodeFactory) {
+      nodeFactory = vagNodes[nodeType];
+    }
 
     if (!nodeFactory) {
       console.warn(`Unknown node type "${nodeType}" for key "${key}" - skipping`);
