@@ -234,19 +234,15 @@ export async function renderAudioBatch(
   // Import and use existing batch renderer
   const { renderAudio } = await import('./render.js');
 
-  // Note: The old renderAudio signature is:
-  // renderAudio(asNEATPatch, waveNetwork, duration, noteDelta, velocity, sampleRate,
-  //             reverse, asDataArray, offlineAudioContext, audioContext,
-  //             useOvertoneInharmonicityFactors, useGPU, antiAliasing, ...)
-  // x and y are NOT parameters here - they're only used in CPPN activation
-
   return await renderAudio(
     asNEATPatch,
     waveNetwork,
     params.duration,
     params.noteDelta,
     params.velocity,
-    params.sampleRate,  // ← Fixed: was incorrectly passing params.x here
+    params.x || 0,
+    params.y || 0,
+    params.sampleRate,
     false, // reverse
     false, // asDataArray
     offlineAudioContext,

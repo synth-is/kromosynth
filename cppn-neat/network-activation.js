@@ -9,14 +9,6 @@ import {GPU} from 'gpu.js';
 
 const ENVIRONMENT_IS_NODE = typeof process==="object"&&typeof process.versions==="object"&&typeof process.versions.node==="string";
 
-// Import OfflineAudioContext for anti-aliasing downsampling
-// Safe to use in streaming mode because it operates on isolated chunks, not the main timeline
-let OfflineAudioContext;
-if (ENVIRONMENT_IS_NODE) {
-  const NodeWebAudioAPI = await import('node-web-audio-api');
-  OfflineAudioContext = NodeWebAudioAPI.OfflineAudioContext;
-}
-
 // import NetworkActivationGPUWorker from "../workers/network-activation-gpu-worker.js?worker";
 
 /**
@@ -40,15 +32,6 @@ class Activator {
       velocity = 1
     ) {
 
-    // Debug: Log parameters for first two chunks
-    if (process.env.DEBUG_INPUTS && sampleOffset <= totalSampleCount / 2) {
-      console.log(`getInputSignals called:`);
-      console.log(`  totalSampleCount: ${totalSampleCount}`);
-      console.log(`  sampleCountToActivate: ${sampleCountToActivate}`);
-      console.log(`  sampleOffset: ${sampleOffset}`);
-      console.log(`  inputPeriods: ${inputPeriods}`);
-    }
-
     const startInputSignalsCalculation = performance.now();
     let inputSignals = Array(sampleCountToActivate).fill(0).map((v,c) => {
       let rangeFraction = (c+sampleOffset) / (totalSampleCount-1);
@@ -58,12 +41,6 @@ class Activator {
       } else {
         var extraInput = Math.sin( inputPeriods * Math.abs(mainInputSignal) );
       }
-
-      // Debug: Log first few samples of first two chunks
-      if (process.env.DEBUG_INPUTS && sampleOffset <= totalSampleCount / 2 && c < 3) {
-        console.log(`    Sample ${c}: rangeFraction=${rangeFraction.toFixed(6)}, mainInput=${mainInputSignal.toFixed(6)}, extraInput=${extraInput.toFixed(6)}`);
-      }
-
       return [extraInput * velocity, mainInputSignal /* * velocity*/];
     });
     const endInputSignalsCalculation = performance.now();
@@ -146,21 +123,16 @@ class Activator {
 
     let _totalSampleCount;
     let _sampleCountToActivate;
-    let _sampleOffset;
-
     if( antiAliasing ) {
       _totalSampleCount = totalSampleCount * 2;
       if( sampleCountToActivate ) {
         _sampleCountToActivate = sampleCountToActivate * 2;
       }
-      // CRITICAL: Also double the offset for oversampled domain
-      _sampleOffset = (sampleOffset || 0) * 2;
     } else {
       _totalSampleCount = totalSampleCount;
       if( sampleCountToActivate ) {
         _sampleCountToActivate = sampleCountToActivate;
       }
-      _sampleOffset = sampleOffset || 0;
     }
 
     if( ! _sampleCountToActivate ) {
@@ -170,6 +142,7 @@ class Activator {
       // useful for multicore computation on multiple sub-web workers.
       _sampleCountToActivate = _totalSampleCount;
     }
+    if( ! sampleOffset ) sampleOffset = 0;
 
     return new Promise( async (resolve, reject) => {
 
@@ -278,7 +251,7 @@ class Activator {
               outputIndexs,
               _totalSampleCount,
               _sampleCountToActivate,
-              _sampleOffset,
+              sampleOffset,
               inputPeriods,
               variationOnPeriods,
               velocity
@@ -290,7 +263,7 @@ class Activator {
                 let _samples;
                 if( antiAliasing ) {
                   _samples = await this.downsampleAndFilterOversampledSignal(
-                    outputSignals[outputIndex], _sampleCountToActivate, sampleCountToActivate
+                    outputSignals[outputIndex], _totalSampleCount, totalSampleCount
                   );
                 } else {
                   _samples = outputSignals[outputIndex];
@@ -308,7 +281,7 @@ class Activator {
         } else {
 
           const inputSignals = this.getInputSignals(
-            _totalSampleCount, _sampleCountToActivate, _sampleOffset,
+            _totalSampleCount, _sampleCountToActivate, sampleOffset,
             inputPeriods, variationOnPeriods,
             velocity
           );

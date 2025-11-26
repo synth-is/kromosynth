@@ -173,50 +173,6 @@ export async function renderAudioStreamingHybrid(
 
   console.log('✅ DSP audio graph wired up with wrapper nodes');
 
-  // MANUAL FIX: Virtual-audio-graph doesn't properly handle AudioNode objects
-  // passed to custom functions, so we need to manually connect wrapper GainNodes
-  // to the virtual-audio-graph's internal nodes
-  if (process.env.LOG_LEVEL === 'debug') {
-    console.log('\n🔧 Manually connecting wrapper GainNodes to virtual audio graph...');
-  }
-
-  // Get all virtual nodes that need wrapper GainNode inputs
-  for (const [networkOutputIndex, wrapperGainNode] of remappedWrapperNodes.entries()) {
-    const connections = synthIsPatch.networkOutputs.find(
-      o => o.networkOutput === networkOutputIndex
-    );
-
-    if (!connections || !connections.audioGraphNodes) continue;
-
-    for (const [audioGraphNodeKey, connectionArray] of Object.entries(connections.audioGraphNodes)) {
-      const virtualNode = virtualAudioGraph.virtualNodes[audioGraphNodeKey];
-
-      // For custom function nodes, we need to find their internal sub-nodes
-      if (virtualNode && virtualNode.virtualNodes) {
-        // This is a custom function with a sub-graph
-        if (process.env.LOG_LEVEL === 'debug') {
-          console.log(`  Connecting wrapper ${networkOutputIndex} to custom node ${audioGraphNodeKey} sub-graph`);
-        }
-
-        // Find the input gain nodes in the sub-graph (they start with 'c')
-        for (const [subNodeKey, subNode] of Object.entries(virtualNode.virtualNodes)) {
-          if (subNodeKey.startsWith('c') && subNode.audioNode) {
-            if (process.env.LOG_LEVEL === 'debug') {
-              console.log(`    → Connecting to sub-node ${subNodeKey}`);
-            }
-            try {
-              wrapperGainNode.connect(subNode.audioNode);
-            } catch (e) {
-              console.warn(`    ✗ Failed to connect: ${e.message}`);
-            }
-          }
-        }
-      }
-    }
-  }
-
-  console.log('');
-
   // Generate and stream CPPN chunks
   streamCPPNChunks(
     cppnOutputNode,
@@ -280,10 +236,6 @@ function setupMessageHandling(workletNode) {
       case 'underrun':
         console.error(`Audio underrun at sample ${data.sample}`);
         break;
-
-      case 'debug':
-        console.log(`[AudioWorklet] ${data.message}`);
-        break;
     }
   };
 }
@@ -336,50 +288,16 @@ async function streamCPPNChunks(
       false, // reverse
       true, // variationOnPeriods
       velocity,
-      false // antiAliasing (DISABLED: OfflineAudioContext has non-determinism bug)
+      antiAliasing
     );
 
     const elapsedMs = performance.now() - startTime;
     console.log(`  Generated in ${elapsedMs.toFixed(1)}ms`);
 
     // Convert Map to object for transfer
-    // IMPORTANT: Map keys to sequential indices for AudioWorklet
-    // memberOutputs uses complex keys like "7_466.16" but AudioWorklet expects "0", "1", "2"...
     const outputsObject = {};
-    let sequentialIndex = 0;
     for (const [outputIndex, outputData] of memberOutputs.entries()) {
-      let samples = outputData.samples;
-
-      // Remove DC offset to prevent low frequency artifacts
-      if (samples && samples.length > 0) {
-        const mean = samples.reduce((sum, s) => sum + s, 0) / samples.length;
-        if (Math.abs(mean) > 0.001) { // Only if significant DC offset
-          samples = samples.map(s => s - mean);
-        }
-      }
-
-      outputsObject[sequentialIndex.toString()] = samples;
-      sequentialIndex++;
-    }
-
-    // Debug: Check first CPPN chunk data quality
-    if (chunkIndex === 0 && process.env.LOG_LEVEL === 'debug') {
-      console.log(`  🔍 Checking CPPN chunk ${chunkIndex} data...`);
-      console.log(`  memberOutputs keys: ${Array.from(memberOutputs.keys()).join(', ')}`);
-
-      const firstKey = Object.keys(outputsObject)[0];
-      const samples = outputsObject[firstKey];
-
-      if (samples) {
-        console.log(`  samples.length: ${samples.length}`);
-
-        let max = 0;
-        for (let i = 0; i < samples.length; i++) {
-          if (Math.abs(samples[i]) > max) max = Math.abs(samples[i]);
-        }
-        const rms = Math.sqrt(samples.reduce((sum, s) => sum + s*s, 0) / samples.length);
-        console.log(`  📊 Stats: max=${max.toFixed(4)}, rms=${rms.toFixed(4)}`);
-      }
+      outputsObject[outputIndex] = outputData.samples;
     }
 
     // Send chunk to AudioWorklet
