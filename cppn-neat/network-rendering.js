@@ -384,17 +384,22 @@ class Renderer {
             }
           } else{
             // Batch mode: use pre-rendered buffers
-            const mixWaveSamples = this.getWavetableMixWaveFromPatch(valueCurves);
-            const audioWavesSamples = this.getWavetableAudioWavesFromPatch(valueCurves);
-
-            const wavetableGraphNode = await this.getWavetableGraphNodeEntry(
-              oneAudioGraphNodeKey, outputKeys, mixWaveSamples, audioWavesSamples,
-              currentTime, duration
-            );
-            if (wavetableGraphNode) {
-              graph[oneAudioGraphNodeKey] = wavetableGraphNode;
-            } else {
+            if (!valueCurves) {
+              console.log(`  ⚠️  No value curves for wavetable ${oneAudioGraphNodeKey} - skipping`);
               delete graph[oneAudioGraphNodeKey];
+            } else {
+              const mixWaveSamples = this.getWavetableMixWaveFromPatch(valueCurves);
+              const audioWavesSamples = this.getWavetableAudioWavesFromPatch(valueCurves);
+
+              const wavetableGraphNode = await this.getWavetableGraphNodeEntry(
+                oneAudioGraphNodeKey, outputKeys, mixWaveSamples, audioWavesSamples,
+                currentTime, duration
+              );
+              if (wavetableGraphNode) {
+                graph[oneAudioGraphNodeKey] = wavetableGraphNode;
+              } else {
+                delete graph[oneAudioGraphNodeKey];
+              }
             }
           }
         } else if( 'additive' === nodeType ) {
@@ -414,18 +419,23 @@ class Renderer {
             }
           } else {
             // Batch mode: use pre-rendered buffers
-            const partialBuffers = this.getAdditiveSynthesisPartialBuffersFromPatch(valueCurves);
-            const gainEnvelopes = this.getAdditiveSynthesisPartialGainEnvelopeValueCurvesFromPatch(valueCurves);
-            const partailGainWeights = this.getPartialGainWeightsFromPatch(patch, oneAudioGraphNodeKey);
-
-            const additiveGrahpNode = await this.getAdditiveSynthesisGraphNodeEntry(
-              outputKeys, partialBuffers, gainEnvelopes, partailGainWeights, currentTime, duration
-            );
-
-            if (additiveGrahpNode) {
-              graph[oneAudioGraphNodeKey] = additiveGrahpNode;
-            } else {
+            if (!valueCurves) {
+              console.log(`  ⚠️  No value curves for additive ${oneAudioGraphNodeKey} - skipping`);
               delete graph[oneAudioGraphNodeKey];
+            } else {
+              const partialBuffers = this.getAdditiveSynthesisPartialBuffersFromPatch(valueCurves);
+              const gainEnvelopes = this.getAdditiveSynthesisPartialGainEnvelopeValueCurvesFromPatch(valueCurves);
+              const partailGainWeights = this.getPartialGainWeightsFromPatch(patch, oneAudioGraphNodeKey);
+
+              const additiveGrahpNode = await this.getAdditiveSynthesisGraphNodeEntry(
+                outputKeys, partialBuffers, gainEnvelopes, partailGainWeights, currentTime, duration
+              );
+
+              if (additiveGrahpNode) {
+                graph[oneAudioGraphNodeKey] = additiveGrahpNode;
+              } else {
+                delete graph[oneAudioGraphNodeKey];
+              }
             }
           }
 
