@@ -402,12 +402,19 @@ async function bulkCompare(dbPath, count = 10, exportAudioPath = null) {
  */
 async function main() {
   const args = process.argv.slice(2);
-  const genomeId = args[args.indexOf('--genome-id') + 1];
-  const dbPath = args[args.indexOf('--db-path') + 1] || DEFAULT_DB_PATH;
-  const count = parseInt(args[args.indexOf('--count') + 1] || '10');
-  const exportAudio = args.includes('--export-audio')
-    ? args[args.indexOf('--export-audio') + 1]
-    : null;
+
+  // Parse arguments with proper existence checks
+  const genomeIdIndex = args.indexOf('--genome-id');
+  const genomeId = genomeIdIndex !== -1 ? args[genomeIdIndex + 1] : undefined;
+
+  const dbPathIndex = args.indexOf('--db-path');
+  const dbPath = dbPathIndex !== -1 ? args[dbPathIndex + 1] : DEFAULT_DB_PATH;
+
+  const countIndex = args.indexOf('--count');
+  const count = countIndex !== -1 ? parseInt(args[countIndex + 1]) : 10;
+
+  const exportAudioIndex = args.indexOf('--export-audio');
+  const exportAudio = exportAudioIndex !== -1 ? args[exportAudioIndex + 1] : null;
 
   if (genomeId) {
     // Single genome comparison

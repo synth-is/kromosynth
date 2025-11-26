@@ -157,7 +157,7 @@ export class StreamingRenderer {
     const { StreamingDSPProcessor } = await import('./streaming-dsp-processor.js');
     const needsCustomDSP = StreamingDSPProcessor.hasCustomDSPNodes(synthIsPatch);
 
-    let audioBuffer;
+    let audioBuffer = null;
 
     if (needsCustomDSP) {
       // Use custom DSP processor for wavetable/additive nodes
@@ -169,7 +169,15 @@ export class StreamingRenderer {
         actualDuration
       );
       audioBuffer = await dspProcessor.renderToBuffer(offlineContext);
-    } else {
+
+      // If custom DSP returns null (no buffers created), fall back to standard rendering
+      if (!audioBuffer) {
+        console.log('  Falling back to standard renderer...');
+      }
+    }
+
+    // Fall back to standard renderer if no custom DSP or if custom DSP returned null
+    if (!needsCustomDSP || !audioBuffer) {
       // Use standard renderer for basic nodes (gain, oscillator, etc.)
       console.log('  Rendering audio graph (using standard renderer)...');
       const { renderAudioAndSpectrogramFromPatchAndMember } = await import('./render.js');

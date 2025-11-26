@@ -394,7 +394,10 @@ export class StreamingDSPProcessor {
       return audioBuffer;
     }
 
-    throw new Error('No wavetable or additive buffers created');
+    // No buffers created - wavetable/additive nodes exist but have no CPPN connections
+    // Return null to signal fallback to standard rendering (matches batch mode behavior)
+    console.warn('  ⚠️  Wavetable/additive nodes found but no CPPN connections - falling back to standard rendering');
+    return null;
   }
 
   /**
