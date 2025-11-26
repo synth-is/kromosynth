@@ -7,6 +7,7 @@ During debugging of batch rendering (Nov 2025), we discovered that **multiple CP
 ## Example Case
 
 **Genome:** `01JF2N9RZ07V06EJ4DJ9ZGCM2D`
+**DB path** `/Volumes/T7/evoruns/supervised_and_unsupervised_singleMapBDs/01JF0WEW4BTQSWWKGFR72JQ7J6_evoConf_singleMap_refSingleEmb_mfcc-sans0-statistics_AE_retrainIncr50_zScoreNSynthTrain_noveltySel`
 **Node:** `P1ek7W` (bufferSource)
 **Problem:** 4 different CPPN outputs all trying to set the `buffer` parameter
 
