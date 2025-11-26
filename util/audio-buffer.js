@@ -130,7 +130,22 @@ export async function getAudioBufferFromGenomeAndMeta(
     frequencyUpdatesApplyToAllPathcNetworkOutputs = false,
     sampleCountToActivate,
     sampleOffset,
+    mode = 'batch',  // 'batch' or 'streaming'
 ) {
+    // MODE GUARD: Route to streaming renderer if requested
+    // This prevents any mixing of batch and streaming code paths
+    if (mode === 'streaming') {
+        const { StreamingRenderer } = await import('./streaming-renderer.js');
+        const sampleRate = audioContext ? audioContext.sampleRate : offlineAudioContext.sampleRate;
+        const renderer = new StreamingRenderer(audioContext, sampleRate, {
+            useGPU,
+            chunkSize: 128  // Can be made configurable later
+        });
+
+        return await renderer.render(genomeAndMeta, duration, offlineAudioContext);
+    }
+
+    // BATCH MODE: Original implementation (unchanged)
     let audioBuffer;
     if( genomeAndMeta.type === "favoriteSound" ) {
         const { patch, member } = genomeAndMeta.genome;
