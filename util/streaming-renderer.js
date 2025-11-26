@@ -153,32 +153,47 @@ export class StreamingRenderer {
 
     console.log(`  ✓ Generated ${allMemberOutputs.size} CPPN outputs in ${numChunks} chunks`);
 
-    // For now, just render with standard approach
-    // TODO: Implement custom DSP graph rendering with chunks
-    console.log('  Rendering audio graph (using standard renderer for now)...');
+    // Check if patch contains wavetable/additive nodes requiring custom DSP
+    const { StreamingDSPProcessor } = await import('./streaming-dsp-processor.js');
+    const needsCustomDSP = StreamingDSPProcessor.hasCustomDSPNodes(synthIsPatch);
 
-    const { renderAudioAndSpectrogramFromPatchAndMember } = await import('./render.js');
+    let audioBuffer;
 
-    // Note: We're passing the chunked CPPN outputs through to standard renderer
-    // This proves chunking works but doesn't yet use suspend/resume
-    const audioBufferAndCanvas = await renderAudioAndSpectrogramFromPatchAndMember(
-      synthIsPatch,
-      waveNetwork,
-      actualDuration,
-      noteDelta,
-      velocity,
-      this.sampleRate,
-      reverse,
-      false, // asDataArray
-      offlineContext,
-      this.audioContext,
-      false, // useOvertoneInharmonicityFactors
-      this.useGPU,
-      false, // antiAliasing
-      false  // frequencyUpdatesApplyToAllPathcNetworkOutputs
-    );
+    if (needsCustomDSP) {
+      // Use custom DSP processor for wavetable/additive nodes
+      console.log('  Rendering with custom DSP processor (wavetable/additive)...');
+      const dspProcessor = new StreamingDSPProcessor(
+        synthIsPatch,
+        allMemberOutputs,
+        this.sampleRate,
+        actualDuration
+      );
+      audioBuffer = await dspProcessor.renderToBuffer(offlineContext);
+    } else {
+      // Use standard renderer for basic nodes (gain, oscillator, etc.)
+      console.log('  Rendering audio graph (using standard renderer)...');
+      const { renderAudioAndSpectrogramFromPatchAndMember } = await import('./render.js');
 
-    const audioBuffer = audioBufferAndCanvas ? audioBufferAndCanvas.audioBuffer : null;
+      // Note: We're passing the chunked CPPN outputs through to standard renderer
+      // This proves chunking works but doesn't yet use suspend/resume
+      const audioBufferAndCanvas = await renderAudioAndSpectrogramFromPatchAndMember(
+        synthIsPatch,
+        waveNetwork,
+        actualDuration,
+        noteDelta,
+        velocity,
+        this.sampleRate,
+        reverse,
+        false, // asDataArray
+        offlineContext,
+        this.audioContext,
+        false, // useOvertoneInharmonicityFactors
+        this.useGPU,
+        false, // antiAliasing
+        false  // frequencyUpdatesApplyToAllPathcNetworkOutputs
+      );
+      audioBuffer = audioBufferAndCanvas ? audioBufferAndCanvas.audioBuffer : null;
+    }
 
     console.log('  ✓ Streaming render complete');
     return audioBuffer;
