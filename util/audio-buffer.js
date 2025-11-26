@@ -136,13 +136,24 @@ export async function getAudioBufferFromGenomeAndMeta(
     // This prevents any mixing of batch and streaming code paths
     if (mode === 'streaming') {
         const { StreamingRenderer } = await import('./streaming-renderer.js');
-        const sampleRate = audioContext ? audioContext.sampleRate : offlineAudioContext.sampleRate;
+        const sampleRate = audioContext ? audioContext.sampleRate : (offlineAudioContext ? offlineAudioContext.sampleRate : 48000);
+
+        // Create OfflineAudioContext if not provided (needed for rendering)
+        let renderContext = offlineAudioContext;
+        if (!renderContext) {
+            const OfflineAudioContext = audioContext.constructor.name === 'AudioContext'
+                ? (await import('node-web-audio-api')).OfflineAudioContext
+                : window.OfflineAudioContext;
+            const totalSamples = Math.round(sampleRate * duration);
+            renderContext = new OfflineAudioContext(1, totalSamples, sampleRate);
+        }
+
         const renderer = new StreamingRenderer(audioContext, sampleRate, {
             useGPU,
             chunkSize: 128  // Can be made configurable later
         });
 
-        return await renderer.render(genomeAndMeta, duration, offlineAudioContext);
+        return await renderer.render(genomeAndMeta, duration, renderContext);
     }
 
     // BATCH MODE: Original implementation (unchanged)
