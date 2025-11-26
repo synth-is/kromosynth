@@ -1,0 +1,82 @@
+/**
+ * AudioWorklet Processor for Capturing Audio During Rendering
+ *
+ * This processor captures audio samples as they flow through the audio graph,
+ * allowing incremental capture during suspend/resume rendering.
+ *
+ * Used for streaming audio generation while maintaining identical output
+ * to batch rendering.
+ */
+
+export const CAPTURE_PROCESSOR_CODE = `
+class CaptureProcessor extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    this.buffer = [];
+    this.totalCaptured = 0;
+    this.chunkSize = 128; // Process quantum size
+
+    // Listen for flush commands
+    this.port.onmessage = (event) => {
+      if (event.data.type === 'flush') {
+        this.flush();
+      }
+    };
+  }
+
+  process(inputs, outputs, parameters) {
+    const input = inputs[0];
+    const output = outputs[0];
+
+    // Pass through audio (copy input to output)
+    for (let channel = 0; channel < Math.min(input.length, output.length); channel++) {
+      const inputChannel = input[channel];
+      const outputChannel = output[channel];
+
+      // Copy samples
+      for (let i = 0; i < inputChannel.length; i++) {
+        outputChannel[i] = inputChannel[i];
+      }
+
+      // Capture samples from first channel only
+      if (channel === 0) {
+        // Add to buffer
+        this.buffer.push(...inputChannel);
+        this.totalCaptured += inputChannel.length;
+
+        // Send chunk when buffer reaches chunk size
+        if (this.buffer.length >= this.chunkSize) {
+          this.sendChunk();
+        }
+      }
+    }
+
+    // Keep processor alive
+    return true;
+  }
+
+  sendChunk() {
+    if (this.buffer.length === 0) return;
+
+    // Convert to Float32Array and send
+    const chunk = new Float32Array(this.buffer);
+    this.port.postMessage({
+      type: 'audioChunk',
+      data: chunk,
+      totalCaptured: this.totalCaptured
+    });
+
+    // Clear buffer
+    this.buffer = [];
+  }
+
+  flush() {
+    // Send any remaining samples
+    if (this.buffer.length > 0) {
+      this.sendChunk();
+    }
+  }
+}
+
+registerProcessor('capture-processor', CaptureProcessor);
+`;
