@@ -194,14 +194,110 @@ export class StreamingDSPProcessor {
   createAdditiveBuffer(nodeKey) {
     console.log(`  Creating additive buffer for node: ${nodeKey}`);
 
-    // TODO: Implementation
-    // 1. Find CPPN outputs for partialBuffer parameter
-    // 2. Find CPPN outputs for partialGainEnvelope parameter
-    // 3. Apply gain envelopes to harmonics
-    // 4. Sum all partials
-    // 5. Create AudioBuffer with result
+    // Additive synthesis combines multiple partials (harmonics) with gain envelopes
+    const partials = []; // {partialBuffer, gainEnvelope}
 
-    return null;
+    for (const networkOutput of this.patch.networkOutputs) {
+      // Check ALL audio graph nodes for partialBuffer/partialGainEnvelope parameters
+      for (const [graphNodeKey, connections] of Object.entries(networkOutput.audioGraphNodes)) {
+        for (const connection of connections) {
+          const outputKey = this.getCPPNOutputKey(networkOutput.networkOutput, networkOutput.frequency);
+          const cppnOutput = this.cppnOutputs.get(outputKey);
+
+          if (!cppnOutput) continue;
+
+          if (connection.paramName === 'partialBuffer') {
+            // This CPPN output provides harmonic content
+            // Find or create partial entry
+            let partial = partials.find(p => p.outputKey === outputKey);
+            if (!partial) {
+              partial = {
+                outputKey,
+                buffer: cppnOutput.samples,
+                gainEnvelope: null,
+                weight: connection.weight || 1.0
+              };
+              partials.push(partial);
+            } else {
+              partial.buffer = cppnOutput.samples;
+            }
+          } else if (connection.paramName === 'partialGainEnvelope') {
+            // This CPPN output provides amplitude envelope
+            let partial = partials.find(p => p.outputKey === outputKey);
+            if (!partial) {
+              partial = {
+                outputKey,
+                buffer: null,
+                gainEnvelope: cppnOutput.samples,
+                weight: connection.weight || 1.0
+              };
+              partials.push(partial);
+            } else {
+              partial.gainEnvelope = cppnOutput.samples;
+            }
+          }
+        }
+      }
+    }
+
+    if (partials.length === 0) {
+      console.warn(`    No partials found for additive ${nodeKey}`);
+      return null;
+    }
+
+    console.log(`    Found ${partials.length} partials`);
+
+    // Sum all partials with their gain envelopes
+    const summed = this.sumAdditivePartials(partials);
+
+    return {
+      samples: summed,
+      nodeKey
+    };
+  }
+
+  /**
+   * Sum additive synthesis partials with gain envelopes
+   *
+   * @param {Array} partials - Array of {buffer, gainEnvelope, weight} objects
+   * @returns {Float32Array} - Summed samples
+   */
+  sumAdditivePartials(partials) {
+    const totalSamples = this.totalSamples;
+    const summed = new Float32Array(totalSamples);
+
+    for (const partial of partials) {
+      if (!partial.buffer) {
+        console.warn(`    Partial ${partial.outputKey} has no buffer, skipping`);
+        continue;
+      }
+
+      for (let i = 0; i < totalSamples; i++) {
+        let sample = partial.buffer[i] * partial.weight;
+
+        // Apply gain envelope if present
+        if (partial.gainEnvelope) {
+          sample *= partial.gainEnvelope[i];
+        }
+
+        summed[i] += sample;
+      }
+    }
+
+    // Normalize to prevent clipping
+    let maxAmplitude = 0;
+    for (let i = 0; i < totalSamples; i++) {
+      maxAmplitude = Math.max(maxAmplitude, Math.abs(summed[i]));
+    }
+
+    if (maxAmplitude > 1.0) {
+      console.log(`    Normalizing additive output (peak: ${maxAmplitude.toFixed(3)})`);
+      for (let i = 0; i < totalSamples; i++) {
+        summed[i] /= maxAmplitude;
+      }
+    }
+
+    return summed;
   }
 
   /**

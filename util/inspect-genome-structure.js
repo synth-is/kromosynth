@@ -10,8 +10,8 @@ import { patchFromAsNEATnetwork } from './audio-graph-asNEAT-bridge.js';
 
 const gunzip = promisify(zlib.gunzip);
 
-const GENOME_ID = '01JF2N9RZ07V06EJ4DJ9ZGCM2D';
-const DB_PATH = '/Volumes/T7/evoruns/supervised_and_unsupervised_singleMapBDs/01JF0WEW4BTQSWWKGFR72JQ7J6_evoConf_singleMap_refSingleEmb_mfcc-sans0-statistics_AE_retrainIncr50_zScoreNSynthTrain_noveltySel/genomes.sqlite';
+const GENOME_ID = process.argv[2] || '01JF2N9RZ07V06EJ4DJ9ZGCM2D';
+const DB_PATH = process.argv[3] || '/Volumes/T7/evoruns/supervised_and_unsupervised_singleMapBDs/01JF0WEW4BTQSWWKGFR72JQ7J6_evoConf_singleMap_refSingleEmb_mfcc-sans0-statistics_AE_retrainIncr50_zScoreNSynthTrain_noveltySel/genomes.sqlite';
 
 async function inspectGenome() {
   console.log(`Inspecting genome: ${GENOME_ID}\n`);
@@ -110,12 +110,24 @@ async function inspectGenome() {
       console.log(`  ${type}: ${count}`);
     }
 
-    // Show wavetable node details
-    console.log('\nWavetable node details:');
+    // Show special node details
+    console.log('\nWavetable nodes:');
     for (const [nodeKey, nodeData] of Object.entries(synthIsPatch.audioGraph)) {
       if (nodeData[0] === 'wavetable') {
         console.log(`  ${nodeKey}:`, JSON.stringify(nodeData, null, 2));
       }
+    }
+
+    console.log('\nAdditive nodes:');
+    for (const [nodeKey, nodeData] of Object.entries(synthIsPatch.audioGraph)) {
+      if (nodeData[0] === 'additive') {
+        console.log(`  ${nodeKey}:`, JSON.stringify(nodeData, null, 2));
+      }
+    }
+
+    console.log('\nAll nodes:');
+    for (const [nodeKey, nodeData] of Object.entries(synthIsPatch.audioGraph)) {
+      console.log(`  ${nodeKey}: ${nodeData[0]}`);
     }
   }
 
