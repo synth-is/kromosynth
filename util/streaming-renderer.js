@@ -73,9 +73,9 @@ export class StreamingRenderer {
     const reverse = genomeAndMeta.reverse || false;
 
     // Use the EXACT SAME rendering function as batch mode
-    const { renderAudioAndSpectrogramFromPatchAndMember } = await import('./render.js');
+    const { renderAudioAndSpectrogram } = await import('./render.js');
 
-    const audioBufferAndCanvas = await renderAudioAndSpectrogramFromPatchAndMember(
+    const audioBufferAndCanvas = await renderAudioAndSpectrogram(
       genome.asNEATPatch,
       waveNetwork,
       actualDuration,
