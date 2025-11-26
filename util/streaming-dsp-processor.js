@@ -41,12 +41,15 @@ export class StreamingDSPProcessor {
   identifyNodesByType(nodeType) {
     const nodes = [];
 
-    // Parse audio graph from patch
-    for (const networkOutput of this.patch.networkOutputs) {
-      for (const [nodeKey, connections] of Object.entries(networkOutput.audioGraphNodes)) {
-        // Check if this node is of the requested type
-        // TODO: Need to determine node type from patch structure
-        // For now, return empty array (to be implemented)
+    if (!this.patch.audioGraph) {
+      return nodes;
+    }
+
+    // Check each node in the audioGraph
+    for (const [nodeKey, nodeData] of Object.entries(this.patch.audioGraph)) {
+      const type = nodeData[0]; // First element is node type
+      if (type === nodeType) {
+        nodes.push(nodeKey);
       }
     }
 
@@ -67,13 +70,114 @@ export class StreamingDSPProcessor {
   createWavetableBuffer(nodeKey) {
     console.log(`  Creating wavetable buffer for node: ${nodeKey}`);
 
-    // TODO: Implementation
-    // 1. Find CPPN outputs connected to this node's 'buffer' parameter
-    // 2. Find CPPN outputs connected to this node's 'mix' parameter
-    // 3. Blend audio waves using mix control
-    // 4. Create AudioBuffer with result
+    // Wavetable nodes synthesize from ALL buffer-targeted CPPN outputs in the patch
+    // (not just connections to this specific node)
+    const audioWaves = []; // CPPN outputs for buffer parameter
+    let mixWave = null;     // CPPN output for mix parameter
 
-    return null;
+    for (const networkOutput of this.patch.networkOutputs) {
+      // Check ALL audio graph nodes for buffer/mix parameters
+      for (const [graphNodeKey, connections] of Object.entries(networkOutput.audioGraphNodes)) {
+        for (const connection of connections) {
+          const outputKey = this.getCPPNOutputKey(networkOutput.networkOutput, networkOutput.frequency);
+
+          if (connection.paramName === 'buffer') {
+            // This CPPN output provides audio content
+            const cppnOutput = this.cppnOutputs.get(outputKey);
+            if (cppnOutput) {
+              audioWaves.push({
+                samples: cppnOutput.samples,
+                weight: connection.weight || 1.0,
+                outputKey,
+                targetNode: graphNodeKey
+              });
+            }
+          } else if (connection.paramName === 'mix') {
+            // This CPPN output controls blending
+            const cppnOutput = this.cppnOutputs.get(outputKey);
+            if (cppnOutput) {
+              mixWave = cppnOutput.samples;
+            }
+          }
+        }
+      }
+    }
+
+    if (audioWaves.length === 0) {
+      console.warn(`    No audio waves found for wavetable ${nodeKey}`);
+      return null;
+    }
+
+    console.log(`    Found ${audioWaves.length} audio waves`);
+    console.log(`    Mix control: ${mixWave ? 'yes' : 'no'}`);
+
+    // Step 2: Blend audio waves using mix control
+    const blendedSamples = this.blendWavetableWaves(audioWaves, mixWave);
+
+    // Step 3: Create AudioBuffer (Note: will be used later in graph building)
+    // For now, just store the samples - we'll create actual AudioBuffer in buildAudioGraph
+    return {
+      samples: blendedSamples,
+      nodeKey
+    };
+  }
+
+  /**
+   * Get CPPN output key from network output index and frequency
+   */
+  getCPPNOutputKey(networkOutput, frequency) {
+    if (networkOutput === 'noiseWhite' || networkOutput === 'noiseBrown' || networkOutput === 'noisePink') {
+      return `${networkOutput}_${frequency}`;
+    }
+    return `${networkOutput}_${frequency}`;
+  }
+
+  /**
+   * Blend multiple audio waves using mix control
+   *
+   * @param {Array} audioWaves - Array of {samples, weight} objects
+   * @param {Float32Array|null} mixWave - Mix control samples (0-1)
+   * @returns {Float32Array} - Blended samples
+   */
+  blendWavetableWaves(audioWaves, mixWave) {
+    const totalSamples = this.totalSamples;
+    const blended = new Float32Array(totalSamples);
+
+    if (audioWaves.length === 1) {
+      // Single wave - no blending needed
+      return audioWaves[0].samples;
+    }
+
+    if (!mixWave) {
+      // No mix control - use equal weighted average
+      console.log(`    Using equal weighted blend (${audioWaves.length} waves)`);
+      for (let i = 0; i < totalSamples; i++) {
+        let sum = 0;
+        for (const wave of audioWaves) {
+          sum += wave.samples[i] * wave.weight;
+        }
+        blended[i] = sum / audioWaves.length;
+      }
+    } else {
+      // Use mix control to blend between waves
+      console.log(`    Using mix-controlled blend (${audioWaves.length} waves)`);
+      for (let i = 0; i < totalSamples; i++) {
+        const mixValue = mixWave[i]; // 0-1 value
+
+        // Simple linear interpolation between waves based on mix value
+        // TODO: More sophisticated blending if needed
+        const waveIndex = Math.floor(mixValue * (audioWaves.length - 1));
+        const nextIndex = Math.min(waveIndex + 1, audioWaves.length - 1);
+        const fraction = (mixValue * (audioWaves.length - 1)) - waveIndex;
+
+        const sample1 = audioWaves[waveIndex].samples[i] * audioWaves[waveIndex].weight;
+        const sample2 = audioWaves[nextIndex].samples[i] * audioWaves[nextIndex].weight;
+
+        blended[i] = sample1 * (1 - fraction) + sample2 * fraction;
+      }
+    }
+
+    return blended;
   }
 
   /**
@@ -135,30 +239,66 @@ export class StreamingDSPProcessor {
     console.log(`  Found ${additiveNodes.length} additive nodes`);
 
     // Create custom buffers for each special node
+    const wavetableBuffers = new Map();
     for (const nodeKey of wavetableNodes) {
       const buffer = this.createWavetableBuffer(nodeKey);
-      if (!buffer) {
-        console.warn(`  Failed to create wavetable buffer for ${nodeKey}`);
+      if (buffer) {
+        wavetableBuffers.set(nodeKey, buffer);
+        console.log(`  ✓ Created wavetable buffer for ${nodeKey}`);
+      } else {
+        console.warn(`  ✗ Failed to create wavetable buffer for ${nodeKey}`);
       }
     }
 
+    const additiveBuffers = new Map();
     for (const nodeKey of additiveNodes) {
       const buffer = this.createAdditiveBuffer(nodeKey);
-      if (!buffer) {
-        console.warn(`  Failed to create additive buffer for ${nodeKey}`);
+      if (buffer) {
+        additiveBuffers.set(nodeKey, buffer);
+        console.log(`  ✓ Created additive buffer for ${nodeKey}`);
+      } else {
+        console.warn(`  ✗ Failed to create additive buffer for ${nodeKey}`);
       }
     }
 
-    // Build modified audio graph
-    const audioGraph = this.buildAudioGraph(offlineContext);
-    if (!audioGraph) {
-      throw new Error('Failed to build audio graph');
+    // For now: Simple implementation - just return first wavetable buffer
+    // TODO: Full audio graph integration
+    if (wavetableBuffers.size > 0) {
+      const firstBuffer = wavetableBuffers.values().next().value;
+      console.log(`  Using simplified rendering (first wavetable only)`);
+
+      // Create AudioBuffer from samples
+      const audioBuffer = offlineContext.createBuffer(
+        1, // mono
+        this.totalSamples,
+        this.sampleRate
+      );
+
+      const channelData = audioBuffer.getChannelData(0);
+      channelData.set(firstBuffer.samples);
+
+      console.log(`  ✓ Custom DSP render complete`);
+      return audioBuffer;
     }
 
-    // Render using Web Audio API
-    // TODO: Implementation
-    // For now, throw error to indicate not yet implemented
-    throw new Error('StreamingDSPProcessor.renderToBuffer() not yet fully implemented');
+    if (additiveBuffers.size > 0) {
+      const firstBuffer = additiveBuffers.values().next().value;
+      console.log(`  Using simplified rendering (first additive only)`);
+
+      const audioBuffer = offlineContext.createBuffer(
+        1,
+        this.totalSamples,
+        this.sampleRate
+      );
+
+      const channelData = audioBuffer.getChannelData(0);
+      channelData.set(firstBuffer.samples);
+
+      console.log(`  ✓ Custom DSP render complete`);
+      return audioBuffer;
+    }
+
+    throw new Error('No wavetable or additive buffers created');
   }
 
   /**
@@ -168,8 +308,18 @@ export class StreamingDSPProcessor {
    * @returns {boolean} - True if special DSP nodes present
    */
   static hasCustomDSPNodes(patch) {
-    // TODO: Implementation
-    // For now, return false (will skip custom DSP)
+    if (!patch || !patch.audioGraph) {
+      return false;
+    }
+
+    // Check for wavetable or additive nodes in audioGraph
+    for (const nodeData of Object.values(patch.audioGraph)) {
+      const nodeType = nodeData[0];
+      if (nodeType === 'wavetable' || nodeType === 'additive') {
+        return true;
+      }
+    }
+
     return false;
   }
 }

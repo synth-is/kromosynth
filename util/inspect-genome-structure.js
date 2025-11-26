@@ -109,6 +109,14 @@ async function inspectGenome() {
     for (const [type, count] of Object.entries(graphNodeTypes).sort((a, b) => b[1] - a[1])) {
       console.log(`  ${type}: ${count}`);
     }
+
+    // Show wavetable node details
+    console.log('\nWavetable node details:');
+    for (const [nodeKey, nodeData] of Object.entries(synthIsPatch.audioGraph)) {
+      if (nodeData[0] === 'wavetable') {
+        console.log(`  ${nodeKey}:`, JSON.stringify(nodeData, null, 2));
+      }
+    }
   }
 
   db.close();
