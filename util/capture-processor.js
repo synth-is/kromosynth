@@ -28,10 +28,25 @@ class CaptureProcessor extends AudioWorkletProcessor {
     const input = inputs[0];
     const output = outputs[0];
 
+    // Guard against undefined inputs/outputs (can happen at end of rendering)
+    if (!input || !output || input.length === 0 || output.length === 0) {
+      // Flush any remaining buffered samples
+      if (this.buffer.length > 0) {
+        this.sendChunk();
+      }
+      // Stop processor when no more data
+      return false;
+    }
+
     // Pass through audio (copy input to output)
     for (let channel = 0; channel < Math.min(input.length, output.length); channel++) {
       const inputChannel = input[channel];
       const outputChannel = output[channel];
+
+      // Guard against undefined channels
+      if (!inputChannel || !outputChannel) {
+        continue;
+      }
 
       // Copy samples
       for (let i = 0; i < inputChannel.length; i++) {
