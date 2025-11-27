@@ -167,10 +167,11 @@ async function demo() {
   // (important for slow renders where RTF > 1)
   const player = new RealtimeAudioPlayer(onlineAudioContext, SAMPLE_RATE, 2.0);
 
-  // Create renderer
+  // Create renderer (measureRTF disabled for instant startup)
   const renderer = new StreamingRenderer(onlineAudioContext, SAMPLE_RATE, {
     useGPU: true,
-    targetLatency: 0.1,  // 100ms target
+    measureRTF: false,  // Skip ~3s RTF measurement for instant startup
+    defaultChunkDuration: 0.5,  // 500ms chunks (adjust if needed)
     enableAdaptiveChunking: true
   });
 
@@ -271,10 +272,9 @@ demo().catch(err => {
 // Handle uncaught errors (AudioWorklet cleanup happens async)
 process.on('uncaughtException', (err) => {
   if (err.message && err.message.includes('expect Object, got: Undefined')) {
-    console.log();
-    console.log('⚠️  AudioWorklet cleanup error (known issue - audio completed successfully)');
-    console.log();
-    process.exit(0);
+    // Don't exit - let playback complete!
+    // The setInterval below will exit when playback finishes
+    return;
   }
   throw err;
 });

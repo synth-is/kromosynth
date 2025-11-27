@@ -33,6 +33,8 @@ export class StreamingRenderer {
    * @param {number} sampleRate - Target sample rate (e.g., 48000)
    * @param {Object} options - Optional configuration
    * @param {boolean} options.useGPU - Enable GPU acceleration for CPPN (default: true)
+   * @param {boolean} options.measureRTF - Measure RTF before rendering (adds ~3s latency) (default: false)
+   * @param {number} options.defaultChunkDuration - Chunk size when not measuring RTF (default: 0.5s)
    * @param {number} options.targetLatency - Target time to first sound in seconds (default: 1.0)
    * @param {number} options.minChunkDuration - Minimum chunk size in seconds (default: 0.1)
    * @param {number} options.maxChunkDuration - Maximum chunk size in seconds (default: 5.0)
@@ -42,6 +44,10 @@ export class StreamingRenderer {
     this.audioContext = audioContext;
     this.sampleRate = sampleRate;
     this.useGPU = options.useGPU !== undefined ? options.useGPU : true;
+
+    // RTF measurement configuration
+    this.measureRTF = options.measureRTF !== undefined ? options.measureRTF : false;
+    this.defaultChunkDuration = options.defaultChunkDuration || 0.5;  // 500ms default
 
     // Adaptive chunking configuration
     this.targetLatency = options.targetLatency || 1.0;  // 1 second to first sound
@@ -89,13 +95,18 @@ export class StreamingRenderer {
       return this._renderBatchMode(genome, genomeAndMeta, actualDuration, offlineContext);
     }
 
-    // Phase 1: Measure RTF and calculate chunk size
-    const rtf = await this._measureRTF(genome, genomeAndMeta);
-    const chunkDuration = this._calculateOptimalChunkSize(rtf);
-
-    console.log(`📊 RTF: ${rtf.toFixed(3)}x (${rtf < 1 ? 'faster' : 'slower'} than real-time)`);
-    console.log(`⚙️  Optimal chunk size: ${chunkDuration.toFixed(2)}s`);
-    console.log(`⏱️  Expected latency to first sound: ${(chunkDuration * rtf * 1000).toFixed(0)}ms`);
+    // Phase 1: Measure RTF and calculate chunk size (optional)
+    let chunkDuration;
+    if (this.measureRTF) {
+      const rtf = await this._measureRTF(genome, genomeAndMeta);
+      chunkDuration = this._calculateOptimalChunkSize(rtf);
+      console.log(`📊 RTF: ${rtf.toFixed(3)}x (${rtf < 1 ? 'faster' : 'slower'} than real-time)`);
+      console.log(`⚙️  Optimal chunk size: ${chunkDuration.toFixed(2)}s`);
+      console.log(`⏱️  Expected latency to first sound: ${(chunkDuration * rtf * 1000).toFixed(0)}ms`);
+    } else {
+      chunkDuration = this.defaultChunkDuration;
+      console.log(`⚙️  Using default chunk size: ${chunkDuration.toFixed(2)}s (RTF measurement skipped for faster startup)`);
+    }
 
     // Phase 2: Suspend/resume + AudioWorklet capture
     return this._renderWithSuspendResume(
@@ -260,7 +271,8 @@ export class StreamingRenderer {
       const { type, data, totalCaptured } = event.data;
       if (type === 'audioChunk') {
         capturedChunks.push(data);
-        console.log(`  ← Captured chunk ${capturedChunks.length}: ${data.length} samples (total: ${totalCaptured})`);
+        // Verbose logging disabled - causes audio distortion
+        // console.log(`  ← Captured chunk ${capturedChunks.length}: ${data.length} samples (total: ${totalCaptured})`);
 
         // Emit chunk to callback
         if (onChunk) {
@@ -279,19 +291,19 @@ export class StreamingRenderer {
       }
     };
 
-    // 4. Schedule suspends
-    console.log('⏸️  Scheduling suspends:');
+    // 4. Schedule suspends (logging disabled - causes audio distortion)
+    // console.log('⏸️  Scheduling suspends:');
     for (let i = 1; i < numChunks; i++) {
       const suspendTime = i * chunkDuration;
       offlineContext.suspend(suspendTime).then(() => {
-        console.log(`  ⏸️  Suspended at ${suspendTime.toFixed(2)}s (chunk ${i}/${numChunks - 1})`);
+        // console.log(`  ⏸️  Suspended at ${suspendTime.toFixed(2)}s (chunk ${i}/${numChunks - 1})`);
         offlineContext.resume();
       });
-      console.log(`  - Suspend at ${suspendTime.toFixed(2)}s`);
+      // console.log(`  - Suspend at ${suspendTime.toFixed(2)}s`);
     }
 
     // 5. Start rendering (with captureNode injected)
-    console.log('\n🎵 Starting render with captureNode...');
+    console.log('🎵 Starting progressive render...');
     const { renderAudioAndSpectrogram } = await import('./render.js');
 
     const startTime = performance.now();
