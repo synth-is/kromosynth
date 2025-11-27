@@ -71,7 +71,7 @@ class RealtimeAudioPlayer {
     // Start playback once we have minimum buffer
     if (!this.isPlaying && this.totalSamplesReceived >= this.minBufferSamples) {
       this.isPlaying = true;
-      this.nextPlayTime = this.audioContext.currentTime + 0.05; // 50ms initial delay
+      this.nextPlayTime = this.audioContext.currentTime + 0.15; // 150ms initial delay for smooth start
       const bufferDuration = this.totalSamplesReceived / this.sampleRate;
       console.log(`\n🔊 Starting playback with ${bufferDuration.toFixed(2)}s buffer...`);
     }
@@ -163,15 +163,14 @@ async function demo() {
     sampleRate: SAMPLE_RATE
   });
 
-  // Create real-time player with 4-second buffer to prevent underruns
-  // (extra headroom accounts for console.log blocking during initial render)
-  const player = new RealtimeAudioPlayer(onlineAudioContext, SAMPLE_RATE, 4.0);
+  // Create real-time player with 1-second buffer for faster startup
+  const player = new RealtimeAudioPlayer(onlineAudioContext, SAMPLE_RATE, 1.0);
 
   // Create renderer (measureRTF disabled for instant startup)
   const renderer = new StreamingRenderer(onlineAudioContext, SAMPLE_RATE, {
     useGPU: true,
     measureRTF: false,  // Skip ~3s RTF measurement for instant startup
-    defaultChunkDuration: 0.5,  // 500ms chunks (adjust if needed)
+    defaultChunkDuration: 0.25,  // 250ms chunks for faster first audio
     enableAdaptiveChunking: true
   });
 
