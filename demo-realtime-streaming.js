@@ -143,8 +143,10 @@ async function demo() {
 
   // Load genome
   console.log('📂 Loading genome...');
+  const genomeLoadStart = Date.now();
   const genome = await loadGenome(GENOME_ID, DB_PATH);
-  console.log(`   ✓ Loaded`);
+  const genomeLoadTime = Date.now() - genomeLoadStart;
+  console.log(`   ✓ Loaded in ${genomeLoadTime}ms`);
   console.log();
 
   const genomeAndMeta = {
@@ -163,8 +165,8 @@ async function demo() {
     sampleRate: SAMPLE_RATE
   });
 
-  // Create real-time player with 1-second buffer for faster startup
-  const player = new RealtimeAudioPlayer(onlineAudioContext, SAMPLE_RATE, 1.0);
+  // Create real-time player with 2-second buffer (balance between latency and smoothness)
+  const player = new RealtimeAudioPlayer(onlineAudioContext, SAMPLE_RATE, 2.0);
 
   // Create renderer (measureRTF disabled for instant startup)
   const renderer = new StreamingRenderer(onlineAudioContext, SAMPLE_RATE, {

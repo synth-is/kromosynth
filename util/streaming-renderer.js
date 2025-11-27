@@ -251,13 +251,15 @@ export class StreamingRenderer {
 
     // 1. Load AudioWorklet
     console.log('📦 Loading AudioWorklet...');
+    const workletLoadStart = performance.now();
     const blob = new Blob([CAPTURE_PROCESSOR_CODE], {
       type: 'application/javascript'
     });
     const url = URL.createObjectURL(blob);
     await offlineContext.audioWorklet.addModule(url);
     URL.revokeObjectURL(url);
-    console.log('  ✓ Loaded');
+    const workletLoadTime = performance.now() - workletLoadStart;
+    console.log(`  ✓ Loaded in ${workletLoadTime.toFixed(1)}ms`);
 
     // 2. Create capture node
     const captureNode = new AudioWorkletNode(
@@ -267,12 +269,20 @@ export class StreamingRenderer {
 
     // 3. Set up chunk collection
     const capturedChunks = [];
+    let firstChunkTime = null;
+    const renderSetupStart = performance.now();
+
     captureNode.port.onmessage = (event) => {
       const { type, data, totalCaptured } = event.data;
       if (type === 'audioChunk') {
         capturedChunks.push(data);
         // Verbose logging disabled - causes audio distortion
         // console.log(`  ← Captured chunk ${capturedChunks.length}: ${data.length} samples (total: ${totalCaptured})`);
+
+        // Track first chunk timing
+        if (firstChunkTime === null) {
+          firstChunkTime = performance.now() - renderSetupStart;
+        }
 
         // Emit chunk to callback
         if (onChunk) {
@@ -337,6 +347,16 @@ export class StreamingRenderer {
 
     console.log(`\n✅ Suspend/resume render complete in ${renderTime.toFixed(2)}s`);
     console.log(`   Total chunks emitted: ${capturedChunks.length}`);
+    console.log();
+    console.log('⏱️  Timing Breakdown (for server optimization):');
+    console.log(`   AudioWorklet load:  ${workletLoadTime.toFixed(1)}ms (can be pre-loaded)`);
+    if (firstChunkTime !== null) {
+      const actualRenderTime = firstChunkTime - workletLoadTime;
+      console.log(`   First chunk render: ${actualRenderTime.toFixed(1)}ms (CPPN init + audio graph + render)`);
+      console.log(`   Total to first chunk: ${firstChunkTime.toFixed(1)}ms`);
+      console.log();
+      console.log(`   💡 Potential savings: ${workletLoadTime.toFixed(1)}ms (pre-load AudioWorklet on server)`);
+    }
 
     return audioBuffer;
   }
