@@ -86,6 +86,7 @@ export function renderAudioAndSpectrogram(
   frequencyUpdatesApplyToAllPathcNetworkOutputs = false,
   sampleCountToActivate,
   sampleOffset,
+  captureNode = null,  // Optional: AudioWorklet node for incremental capture
 ) {
   const asNEATNetworkJSONString = isString(asNEATPatch) ? asNEATPatch : asNEATPatch.toJSON();
   const synthIsPatch = patchFromAsNEATnetwork( asNEATNetworkJSONString );
@@ -102,6 +103,7 @@ export function renderAudioAndSpectrogram(
     frequencyUpdatesApplyToAllPathcNetworkOutputs,
     sampleCountToActivate,
     sampleOffset,
+    captureNode,
   );
 }
 
@@ -117,6 +119,7 @@ export async function renderAudioAndSpectrogramFromPatchAndMember(
   frequencyUpdatesApplyToAllPathcNetworkOutputs = false,
   sampleCountToActivate,
   sampleOffset,
+  captureNode = null,  // Optional: AudioWorklet node for incremental capture
 ) {
   const memberOutputs = await startMemberOutputsRendering(
     waveNetwork, synthIsPatch,
@@ -145,7 +148,8 @@ export async function renderAudioAndSpectrogramFromPatchAndMember(
     offlineAudioContext,
     audioContext,
     useOvertoneInharmonicityFactors,
-    frequencyUpdatesApplyToAllPathcNetworkOutputs
+    frequencyUpdatesApplyToAllPathcNetworkOutputs,
+    captureNode
   );
 
   return audioBufferAndCanvas;
@@ -227,7 +231,8 @@ export function startAudioBuffersRendering(
   offlineAudioContext,
   audioContext,
   useOvertoneInharmonicityFactors,
-  frequencyUpdatesApplyToAllPathcNetworkOutputs = false
+  frequencyUpdatesApplyToAllPathcNetworkOutputs = false,
+  captureNode = null  // Optional: AudioWorklet node for incremental capture
 ) {
   return getAudioBuffersForMember(
     memberOutputs /*existingMemberOutputs*/,
@@ -244,7 +249,8 @@ export function startAudioBuffersRendering(
     offlineAudioContext,
     audioContext,
     useOvertoneInharmonicityFactors,
-    frequencyUpdatesApplyToAllPathcNetworkOutputs
+    frequencyUpdatesApplyToAllPathcNetworkOutputs,
+    captureNode
   );
 }
 

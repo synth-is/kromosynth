@@ -451,7 +451,8 @@ function getAudioBuffersForMember(
   offlineAudioContext,
   audioContext,
   useOvertoneInharmonicityFactors,
-  frequencyUpdatesApplyToAllPathcNetworkOutputs = false
+  frequencyUpdatesApplyToAllPathcNetworkOutputs = false,
+  captureNode = null  // Optional: AudioWorklet node for incremental capture
 ) {
   return new Promise( (resolve, reject) => {
 
@@ -484,7 +485,8 @@ function getAudioBuffersForMember(
         memberOutputs, patch, noteDelta, spectrogramDimensions,
         getDataArray,
         offlineAudioContext,
-        audioContext
+        audioContext,
+        captureNode
       )
       .then(
         audioBufferAndCanvas => resolve(audioBufferAndCanvas),

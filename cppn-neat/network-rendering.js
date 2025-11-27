@@ -31,7 +31,8 @@ class Renderer {
       audioContextInstance,
       sampleCount,
       wrapperNodes = null,
-      mode = 'batch'
+      mode = 'batch',
+      captureNode = null  // Optional: AudioWorklet node for incremental capture
   ) {
 
     return new Promise( (resolve, reject) => {
@@ -43,9 +44,16 @@ class Renderer {
 
       // getWawetableSynthesisExampleGraph();
 
+      // If captureNode provided, use it as output and connect to destination
+      // Otherwise connect directly to destination (batch mode)
+      const outputNode = captureNode || audioContextInstance.destination;
+      if (captureNode) {
+        captureNode.connect(audioContextInstance.destination);
+      }
+
       const virtualAudioGraph = createVirtualAudioGraphWithCompiler({
         audioContext: audioContextInstance,
-        output: audioContextInstance.destination,
+        output: outputNode,
       });
 
       // this.updateWithTestFMAudioGraph(
@@ -97,7 +105,8 @@ class Renderer {
       memberOutputs, patch, noteDelta, spectrogramDimensions,
       getDataArray,
       offlineAudioContext,
-      audioContext
+      audioContext,
+      captureNode = null  // Optional: AudioWorklet node for incremental capture
   ) {
     return new Promise( (resolve, reject) => {
 
@@ -125,7 +134,10 @@ class Renderer {
       this.wireUpAudioGraphAndConnectToAudioContextDestination(
           memberOutputs, patch, noteDelta,
           offlineAudioContextInstance,
-          sampleCount
+          sampleCount,
+          null,  // wrapperNodes
+          'batch',  // mode
+          captureNode  // Pass captureNode through
       ).then( virtualAudioGraph => {
 
         /////////// spectrogram
