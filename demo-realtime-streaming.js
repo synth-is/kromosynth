@@ -28,12 +28,12 @@ const gunzip = promisify(zlib.gunzip);
 
 // Configuration
 const GENOME_ID = '01JF2N9RZ07V06EJ4DJ9ZGCM2D';
-const DB_PATH = '/Volumes/T7/evoruns/supervised_and_unsupervised_singleMapBDs/01JF0WEW4BTQSWWKGFR72JQ7J6_evoConf_singleMap_refSingleEmb_mfcc-sans0-statistics_AE_retrainIncr50_zScoreNSynthTrain_noveltySel/genomes.sqlite';
+const DB_PATH = '/Users/bjornpjo/QD/evoruns/01JF0WEW4BTQSWWKGFR72JQ7J6_evoConf_singleMap_refSingleEmb_mfcc-sans0-statistics_AE_retrainIncr50_zScoreNSynthTrain_noveltySel/genomes.sqlite';
 const SAMPLE_RATE = 48000;
 
 // Parse command-line arguments
 const args = process.argv.slice(2);
-const DURATION = args[0] ? parseFloat(args[0]) : 100.0;
+const DURATION = args[0] ? parseFloat(args[0]) : 10.0;
 const NOTE_DELTA = args[1] ? parseFloat(args[1]) : 0;
 const VELOCITY = args[2] ? parseFloat(args[2]) : 0.5;
 
@@ -50,7 +50,7 @@ async function loadGenome(genomeId, dbPath) {
 }
 
 class RealtimeAudioPlayer {
-  constructor(audioContext, sampleRate) {
+  constructor(audioContext, sampleRate, minBufferDuration = 0.05) {
     this.audioContext = audioContext;
     this.sampleRate = sampleRate;
     this.chunks = [];
@@ -58,6 +58,7 @@ class RealtimeAudioPlayer {
     this.totalSamplesReceived = 0;
     this.totalSamplesScheduled = 0;
     this.isPlaying = false;
+    this.minBufferSamples = Math.round(minBufferDuration * sampleRate);
   }
 
   /**
@@ -67,15 +68,18 @@ class RealtimeAudioPlayer {
     this.chunks.push(chunkData);
     this.totalSamplesReceived += chunkData.length;
 
-    // Start playback on first chunk
-    if (!this.isPlaying) {
+    // Start playback once we have minimum buffer
+    if (!this.isPlaying && this.totalSamplesReceived >= this.minBufferSamples) {
       this.isPlaying = true;
       this.nextPlayTime = this.audioContext.currentTime + 0.05; // 50ms initial delay
-      console.log(`\n🔊 Starting playback at ${this.nextPlayTime.toFixed(2)}s...`);
+      const bufferDuration = this.totalSamplesReceived / this.sampleRate;
+      console.log(`\n🔊 Starting playback with ${bufferDuration.toFixed(2)}s buffer...`);
     }
 
-    // Schedule this chunk
-    this.scheduleChunk(chunkData);
+    // Schedule this chunk if playback started
+    if (this.isPlaying) {
+      this.scheduleChunk(chunkData);
+    }
   }
 
   /**
@@ -159,8 +163,9 @@ async function demo() {
     sampleRate: SAMPLE_RATE
   });
 
-  // Create real-time player
-  const player = new RealtimeAudioPlayer(onlineAudioContext, SAMPLE_RATE);
+  // Create real-time player with 2-second buffer to prevent underruns
+  // (important for slow renders where RTF > 1)
+  const player = new RealtimeAudioPlayer(onlineAudioContext, SAMPLE_RATE, 2.0);
 
   // Create renderer
   const renderer = new StreamingRenderer(onlineAudioContext, SAMPLE_RATE, {
@@ -250,7 +255,26 @@ async function demo() {
 }
 
 demo().catch(err => {
+  // Ignore AudioWorklet cleanup errors (known issue in node-web-audio-api)
+  if (err.message && err.message.includes('expect Object, got: Undefined')) {
+    console.log();
+    console.log('⚠️  AudioWorklet cleanup error (known issue - does not affect playback)');
+    console.log();
+    process.exit(0);
+  }
+
   console.error('Demo failed:', err);
   console.error(err.stack);
   process.exit(1);
+});
+
+// Handle uncaught errors (AudioWorklet cleanup happens async)
+process.on('uncaughtException', (err) => {
+  if (err.message && err.message.includes('expect Object, got: Undefined')) {
+    console.log();
+    console.log('⚠️  AudioWorklet cleanup error (known issue - audio completed successfully)');
+    console.log();
+    process.exit(0);
+  }
+  throw err;
 });
