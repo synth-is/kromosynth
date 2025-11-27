@@ -249,39 +249,30 @@ export class StreamingRenderer {
 
     console.log(`🎬 Starting suspend/resume render (${numChunks} chunks of ${chunkDuration}s)`);
 
-    // 1. Load AudioWorklet
-    console.log('📦 Loading AudioWorklet...');
-    console.log(`  audioContext.audioWorklet: ${this.audioContext?.audioWorklet}`);
-    console.log(`  offlineContext.audioWorklet: ${offlineContext?.audioWorklet}`);
+    // 1. Load AudioWorklet on offlineContext (required - can't use different context)
+    let workletLoadTime = 0;
 
+    // IMPORTANT: Must load on offlineContext where rendering happens
+    // (audioContext is only for GPU CPPN computation, not for audio graph)
+    if (!offlineContext.audioWorklet) {
+      throw new Error('offlineContext does not have audioWorklet property. This may be a node-web-audio-api version issue.');
+    }
+
+    console.log('📦 Loading AudioWorklet...');
     const workletLoadStart = performance.now();
     const blob = new Blob([CAPTURE_PROCESSOR_CODE], {
       type: 'application/javascript'
     });
     const url = URL.createObjectURL(blob);
-
-    // Try to find a context with audioWorklet
-    const contextWithWorklet = offlineContext.audioWorklet ? offlineContext :
-                               this.audioContext?.audioWorklet ? this.audioContext :
-                               null;
-
-    if (!contextWithWorklet) {
-      throw new Error('Neither audioContext nor offlineContext have audioWorklet property. This may be a node-web-audio-api version issue.');
-    }
-
-    console.log(`  Using context: ${contextWithWorklet === offlineContext ? 'offlineContext' : 'audioContext'}`);
-    console.log(`  contextWithWorklet constructor: ${contextWithWorklet.constructor.name}`);
-
-    await contextWithWorklet.audioWorklet.addModule(url);
-
+    await offlineContext.audioWorklet.addModule(url);
     URL.revokeObjectURL(url);
-    const workletLoadTime = performance.now() - workletLoadStart;
+    workletLoadTime = performance.now() - workletLoadStart;
     console.log(`  ✓ Loaded in ${workletLoadTime.toFixed(1)}ms`);
 
-    // 2. Create capture node (must use the same context that loaded the worklet)
-    console.log(`  Creating AudioWorkletNode on ${contextWithWorklet === offlineContext ? 'offlineContext' : 'audioContext'}`);
+    // 2. Create capture node on offlineContext
+    console.log('  Creating AudioWorkletNode on offlineContext');
     const captureNode = new AudioWorkletNode(
-      contextWithWorklet,
+      offlineContext,
       'capture-processor'
     );
 
@@ -384,14 +375,12 @@ export class StreamingRenderer {
     console.log(`\n✅ Suspend/resume render complete in ${renderTime.toFixed(2)}s`);
     console.log(`   Total chunks emitted: ${capturedChunks.length}`);
     console.log();
-    console.log('⏱️  Timing Breakdown (for server optimization):');
-    console.log(`   AudioWorklet load:  ${workletLoadTime.toFixed(1)}ms (can be pre-loaded)`);
+    console.log('⏱️  Timing Breakdown:');
+    console.log(`   AudioWorklet load:  ${workletLoadTime.toFixed(1)}ms (required on offlineContext, can't be pre-loaded)`);
     if (firstChunkTime !== null) {
       const actualRenderTime = firstChunkTime - workletLoadTime;
       console.log(`   First chunk render: ${actualRenderTime.toFixed(1)}ms (CPPN init + audio graph + render)`);
       console.log(`   Total to first chunk: ${firstChunkTime.toFixed(1)}ms`);
-      console.log();
-      console.log(`   💡 Potential savings: ${workletLoadTime.toFixed(1)}ms (pre-load AudioWorklet on server)`);
     }
 
     return audioBuffer;
