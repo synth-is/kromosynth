@@ -20,6 +20,7 @@
 import Database from 'better-sqlite3';
 import zlib from 'zlib';
 import { promisify } from 'util';
+import { writeFileSync } from 'fs';
 import { StreamingRenderer } from './util/streaming-renderer.js';
 import NodeWebAudioAPI from 'node-web-audio-api';
 const { OfflineAudioContext, AudioContext } = NodeWebAudioAPI;
@@ -47,6 +48,55 @@ async function loadGenome(genomeId, dbPath) {
   db.close();
 
   return genomeData.genome || genomeData;
+}
+
+function writeWavFile(audioBuffer, filename) {
+  const channelData = audioBuffer.getChannelData(0);
+  const sampleRate = audioBuffer.sampleRate;
+  const numSamples = channelData.length;
+
+  // Convert float32 to int16
+  const int16Data = new Int16Array(numSamples);
+  for (let i = 0; i < numSamples; i++) {
+    const s = Math.max(-1, Math.min(1, channelData[i]));
+    int16Data[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+  }
+
+  // Create WAV header
+  const dataSize = int16Data.length * 2;
+  const buffer = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(buffer);
+
+  // RIFF chunk descriptor
+  writeString(view, 0, 'RIFF');
+  view.setUint32(4, 36 + dataSize, true);
+  writeString(view, 8, 'WAVE');
+
+  // fmt sub-chunk
+  writeString(view, 12, 'fmt ');
+  view.setUint32(16, 16, true); // SubChunk1Size (16 for PCM)
+  view.setUint16(20, 1, true); // AudioFormat (1 for PCM)
+  view.setUint16(22, 1, true); // NumChannels (1 = mono)
+  view.setUint32(24, sampleRate, true); // SampleRate
+  view.setUint32(28, sampleRate * 2, true); // ByteRate
+  view.setUint16(32, 2, true); // BlockAlign
+  view.setUint16(34, 16, true); // BitsPerSample
+
+  // data sub-chunk
+  writeString(view, 36, 'data');
+  view.setUint32(40, dataSize, true);
+
+  // Write PCM data
+  const bytes = new Uint8Array(buffer);
+  bytes.set(new Uint8Array(int16Data.buffer), 44);
+
+  writeFileSync(filename, Buffer.from(buffer));
+}
+
+function writeString(view, offset, string) {
+  for (let i = 0; i < string.length; i++) {
+    view.setUint8(offset + i, string.charCodeAt(i));
+  }
 }
 
 class RealtimeAudioPlayer {
@@ -222,12 +272,19 @@ async function demo() {
   );
 
   // Wait for rendering to complete
-  await renderPromise;
+  const finalBuffer = await renderPromise;
   const totalTime = Date.now() - startTime;
 
   console.log();
   console.log();
   console.log('✅ Rendering complete!');
+  console.log();
+
+  // Write to WAV file for verification
+  const wavFilename = `./realtime-streaming-${GENOME_ID.slice(-8)}_${DURATION}s.wav`;
+  console.log(`💾 Writing WAV file: ${wavFilename}`);
+  writeWavFile(finalBuffer, wavFilename);
+  console.log(`   ✓ WAV file written`);
   console.log();
 
   const status = player.getStatus();
