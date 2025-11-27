@@ -163,9 +163,9 @@ async function demo() {
     sampleRate: SAMPLE_RATE
   });
 
-  // Create real-time player with 2-second buffer to prevent underruns
-  // (important for slow renders where RTF > 1)
-  const player = new RealtimeAudioPlayer(onlineAudioContext, SAMPLE_RATE, 2.0);
+  // Create real-time player with 4-second buffer to prevent underruns
+  // (extra headroom accounts for console.log blocking during initial render)
+  const player = new RealtimeAudioPlayer(onlineAudioContext, SAMPLE_RATE, 4.0);
 
   // Create renderer (measureRTF disabled for instant startup)
   const renderer = new StreamingRenderer(onlineAudioContext, SAMPLE_RATE, {
@@ -178,7 +178,6 @@ async function demo() {
   console.log('🎬 Starting progressive render...');
   console.log();
 
-  let lastProgressUpdate = Date.now();
   let firstChunkReceived = false;
   const startTime = Date.now();
 
@@ -199,21 +198,21 @@ async function demo() {
         // Add chunk to player - it will be scheduled for real-time playback
         player.addChunk(chunk);
 
-        // Periodic status updates
-        const now = Date.now();
-        if (now - lastProgressUpdate > 500) {  // Update every 500ms
-          const status = player.getStatus();
-          const receivedSeconds = status.samplesReceived / SAMPLE_RATE;
-          const scheduledSeconds = status.samplesScheduled / SAMPLE_RATE;
+        // Periodic status updates (disabled - console.log can block audio thread)
+        // const now = Date.now();
+        // if (now - lastProgressUpdate > 500) {  // Update every 500ms
+        //   const status = player.getStatus();
+        //   const receivedSeconds = status.samplesReceived / SAMPLE_RATE;
+        //   const scheduledSeconds = status.samplesScheduled / SAMPLE_RATE;
 
-          process.stdout.write(
-            `\r  Rendering: ${receivedSeconds.toFixed(1)}s / ${DURATION}s  |  ` +
-            `Playing: ${scheduledSeconds.toFixed(1)}s  |  ` +
-            `Buffer: ${status.timeUntilComplete.toFixed(1)}s ahead     `
-          );
+        //   process.stdout.write(
+        //     `\r  Rendering: ${receivedSeconds.toFixed(1)}s / ${DURATION}s  |  ` +
+        //     `Playing: ${scheduledSeconds.toFixed(1)}s  |  ` +
+        //     `Buffer: ${status.timeUntilComplete.toFixed(1)}s ahead     `
+        //   );
 
-          lastProgressUpdate = now;
-        }
+        //   lastProgressUpdate = now;
+        // }
       },
       onProgress: () => {
         // Progress tracking handled by onChunk callback
