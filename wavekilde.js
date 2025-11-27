@@ -325,6 +325,8 @@ export function getPatchWithBufferFrequenciesUpdatedAccordingToNoteDelta(
         }
       }
       if( networkOutputConnectedToBuffer ) {
+        // Store original frequency for CPPN lookup (oneCPPNPerFrequency mode)
+        networkOutputConnectedToBuffer.originalFrequency = networkOutputConnectedToBuffer.frequency;
         networkOutputConnectedToBuffer.frequency = getFrequencyToNoteDelta(
           networkOutputConnectedToBuffer.frequency,
           noteDelta
@@ -335,6 +337,8 @@ export function getPatchWithBufferFrequenciesUpdatedAccordingToNoteDelta(
         // assume that there is just one audioGraphNode in this networkOutput connected to a partialBuffer
         // TODO sophisticate?
         const partailBufferConnection = Object.values(networkOutputConnectedToPartialBuffer.audioGraphNodes)[0][0];
+        // Store original frequency for CPPN lookup (oneCPPNPerFrequency mode)
+        networkOutputConnectedToPartialBuffer.originalFrequency = networkOutputConnectedToPartialBuffer.frequency;
         const frequencyToNoteDelta = getFrequencyToNoteDelta(
           networkOutputConnectedToPartialBuffer.frequency,
           noteDelta
@@ -356,6 +360,8 @@ export function getPatchWithBufferFrequenciesUpdatedAccordingToNoteDelta(
       }
       if( networkOutputConnectedToOtherParams ) {
         if( updateAllNetworkOutputs ) {
+          // Store original frequency for CPPN lookup (oneCPPNPerFrequency mode)
+          networkOutputConnectedToOtherParams.originalFrequency = networkOutputConnectedToOtherParams.frequency;
           networkOutputConnectedToOtherParams.frequency = getFrequencyToNoteDelta(
             networkOutputConnectedToOtherParams.frequency,
             noteDelta

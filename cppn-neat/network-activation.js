@@ -183,7 +183,9 @@ class Activator {
         const memberOutputsKey = getMemberOutputsKey( oneOutput );
         memberOutputs.set( memberOutputsKey, {
           samples: undefined,
-          frequency: oneOutput.frequency
+          frequency: oneOutput.frequency,
+          // Store original frequency for CPPN lookup when using oneCPPNPerFrequency with noteDelta
+          originalFrequency: oneOutput.originalFrequency || oneOutput.frequency
         });
 
         // if( oneOutput.frequencyUpdated ) {
@@ -213,8 +215,19 @@ class Activator {
         const outputIndexs = [];
         if( member.oneCPPNPerFrequency ) {
           // we have one CPPN specialised on each unique frequency
-          const oneFrequencyCPPNMember = member.CPPNs[ 
-            getRoundedFrequencyValue( frequency ) 
+          // Use originalFrequency (before noteDelta) for CPPN lookup
+          // Find the original frequency by checking any output with this modified frequency
+          let frequencyForLookup = frequency;
+          for( let oneOutput of _outputsToActivate ) {
+            const memberOutputsKey = getMemberOutputsKey( oneOutput );
+            const outputData = memberOutputs.get(memberOutputsKey);
+            if( outputData.frequency === frequency && outputData.originalFrequency ) {
+              frequencyForLookup = outputData.originalFrequency;
+              break;
+            }
+          }
+          const oneFrequencyCPPNMember = member.CPPNs[
+            getRoundedFrequencyValue( frequencyForLookup )
           ];
           memberCPPN = this.getCPPNFromMember( oneFrequencyCPPNMember );
 
@@ -227,7 +240,9 @@ class Activator {
         // _outputsToActivate.forEach( oneOutput => {
         for( let oneOutput of _outputsToActivate ) {
           const memberOutputsKey = getMemberOutputsKey( oneOutput );
-          if( frequency == memberOutputs.get(memberOutputsKey).frequency ) {
+          const outputFreq = memberOutputs.get(memberOutputsKey).frequency;
+          // Match against the actual frequency in memberOutputs (which may be modified by noteDelta)
+          if( frequency == outputFreq ) {
             outputIndexs.push( parseInt(oneOutput.index) ); // when patch comes in from asNEAT, the index is a string
           }
         } //);
@@ -857,6 +872,8 @@ class Activator {
       return {
         index: oneOutputConfig.networkOutput,
         frequency: oneOutputConfig.frequency,
+        // Include originalFrequency for CPPN lookup with noteDelta
+        originalFrequency: oneOutputConfig.originalFrequency,
         // frequencyUpdated: oneOutputConfig.frequencyUpdated,
       };
     });

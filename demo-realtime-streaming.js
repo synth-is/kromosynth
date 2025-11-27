@@ -28,7 +28,7 @@ const { OfflineAudioContext, AudioContext } = NodeWebAudioAPI;
 const gunzip = promisify(zlib.gunzip);
 
 // Configuration
-const GENOME_ID = '01JF2N9RZ07V06EJ4DJ9ZGCM2D';
+const GENOME_ID = '01JF2RQPZHG2SPEKM7AFK7PX31'; // '01JF2N9RZ07V06EJ4DJ9ZGCM2D';
 const DB_PATH = '/Users/bjornpjo/QD/evoruns/01JF0WEW4BTQSWWKGFR72JQ7J6_evoConf_singleMap_refSingleEmb_mfcc-sans0-statistics_AE_retrainIncr50_zScoreNSynthTrain_noveltySel/genomes.sqlite';
 const SAMPLE_RATE = 48000;
 
