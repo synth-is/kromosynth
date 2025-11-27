@@ -100,7 +100,7 @@ function writeString(view, offset, string) {
 }
 
 class RealtimeAudioPlayer {
-  constructor(audioContext, sampleRate, minBufferDuration = 0.05) {
+  constructor(audioContext, sampleRate, minBufferDuration = 0.05, scheduleBatchSize = 0.1) {
     this.audioContext = audioContext;
     this.sampleRate = sampleRate;
     this.chunks = [];
@@ -109,10 +109,15 @@ class RealtimeAudioPlayer {
     this.totalSamplesScheduled = 0;
     this.isPlaying = false;
     this.minBufferSamples = Math.round(minBufferDuration * sampleRate);
+
+    // Batching to reduce AudioBuffer creation overhead
+    this.scheduleBatchSize = Math.round(scheduleBatchSize * sampleRate); // e.g., 0.1s = 4800 samples
+    this.pendingBatch = [];
+    this.pendingBatchSamples = 0;
   }
 
   /**
-   * Add a chunk and schedule it for playback
+   * Add a chunk and schedule it for playback (with batching)
    */
   addChunk(chunkData) {
     this.chunks.push(chunkData);
@@ -126,9 +131,46 @@ class RealtimeAudioPlayer {
       console.log(`\n🔊 Starting playback with ${bufferDuration.toFixed(2)}s buffer...`);
     }
 
-    // Schedule this chunk if playback started
+    // Batch chunks together before scheduling (reduces AudioBuffer overhead)
     if (this.isPlaying) {
-      this.scheduleChunk(chunkData);
+      this.pendingBatch.push(chunkData);
+      this.pendingBatchSamples += chunkData.length;
+
+      // Schedule batch when it reaches target size
+      if (this.pendingBatchSamples >= this.scheduleBatchSize) {
+        this.scheduleBatch();
+      }
+    }
+  }
+
+  /**
+   * Schedule accumulated batch of chunks as a single AudioBuffer
+   */
+  scheduleBatch() {
+    if (this.pendingBatch.length === 0) return;
+
+    // Combine pending chunks into single Float32Array
+    const combinedData = new Float32Array(this.pendingBatchSamples);
+    let offset = 0;
+    for (const chunk of this.pendingBatch) {
+      combinedData.set(chunk, offset);
+      offset += chunk.length;
+    }
+
+    // Schedule the combined buffer
+    this.scheduleChunk(combinedData);
+
+    // Reset batch
+    this.pendingBatch = [];
+    this.pendingBatchSamples = 0;
+  }
+
+  /**
+   * Flush any remaining batched chunks
+   */
+  flushBatch() {
+    if (this.pendingBatch.length > 0) {
+      this.scheduleBatch();
     }
   }
 
@@ -274,6 +316,9 @@ async function demo() {
   // Wait for rendering to complete
   const finalBuffer = await renderPromise;
   const totalTime = Date.now() - startTime;
+
+  // Flush any remaining batched chunks
+  player.flushBatch();
 
   console.log();
   console.log();
