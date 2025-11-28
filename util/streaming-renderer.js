@@ -39,6 +39,9 @@ export class StreamingRenderer {
    * @param {number} options.minChunkDuration - Minimum chunk size in seconds (default: 0.1)
    * @param {number} options.maxChunkDuration - Maximum chunk size in seconds (default: 5.0)
    * @param {boolean} options.enableAdaptiveChunking - Use adaptive chunk sizing (default: true)
+   * @param {boolean} options.controlledResume - Enable client-controlled resume (default: false)
+   * @param {number} options.initialBufferDuration - Initial buffer size for controlled resume (default: 2.0s)
+   * @param {number} options.bufferAhead - How far ahead to stay in controlled mode (default: 2.0s)
    */
   constructor(audioContext, sampleRate, options = {}) {
     this.audioContext = audioContext;
@@ -54,6 +57,11 @@ export class StreamingRenderer {
     this.minChunkDuration = options.minChunkDuration || 0.1;  // 100ms minimum
     this.maxChunkDuration = options.maxChunkDuration || 5.0;  // 5s maximum
     this.enableAdaptiveChunking = options.enableAdaptiveChunking !== false;
+
+    // Client-controlled resume configuration
+    this.controlledResume = options.controlledResume || false;
+    this.initialBufferDuration = options.initialBufferDuration || 2.0;  // 2s initial buffer
+    this.bufferAhead = options.bufferAhead || 2.0;  // Stay 2s ahead
   }
 
   /**
@@ -68,10 +76,12 @@ export class StreamingRenderer {
    * @param {Object} options - Rendering options
    * @param {Function} options.onChunk - Callback for progressive chunks (chunk: Float32Array) => void
    * @param {Function} options.onProgress - Progress callback (progress: {rendered, total, rtf}) => void
+   * @param {Function} options.shouldResume - (renderedDuration) => boolean - Return true to resume rendering (controlled mode)
+   * @param {Function} options.onBufferFull - (renderedDuration) => void - Called when initial buffer is complete (controlled mode)
    * @returns {Promise<AudioBuffer>} - Final rendered audio buffer
    */
   async render(genomeAndMeta, duration, offlineContext, options = {}) {
-    const { onChunk, onProgress } = options;
+    const { onChunk, onProgress, shouldResume, onBufferFull } = options;
 
     console.log('🎵 StreamingRenderer: Starting adaptive render');
 
@@ -118,7 +128,9 @@ export class StreamingRenderer {
       offlineContext,
       chunkDuration,
       onChunk,
-      onProgress
+      onProgress,
+      shouldResume,
+      onBufferFull
     );
   }
 
@@ -242,7 +254,9 @@ export class StreamingRenderer {
     offlineContext,
     chunkDuration,
     onChunk,
-    onProgress
+    onProgress,
+    shouldResume,
+    onBufferFull
   ) {
     const { waveNetwork } = genome;
     const numChunks = Math.ceil(duration / chunkDuration);
@@ -316,15 +330,47 @@ export class StreamingRenderer {
       }
     };
 
-    // 4. Schedule suspends (logging disabled - causes audio distortion)
-    // console.log('⏸️  Scheduling suspends:');
+    // 4. Schedule suspends with controlled resume support
+    const initialChunks = this.controlledResume
+      ? Math.ceil(this.initialBufferDuration / chunkDuration)
+      : numChunks;
+
+    if (this.controlledResume) {
+      console.log(`📊 Controlled resume: initial buffer = ${this.initialBufferDuration}s (${initialChunks} chunks), buffer ahead = ${this.bufferAhead}s`);
+    }
+
     for (let i = 1; i < numChunks; i++) {
       const suspendTime = i * chunkDuration;
-      offlineContext.suspend(suspendTime).then(() => {
-        // console.log(`  ⏸️  Suspended at ${suspendTime.toFixed(2)}s (chunk ${i}/${numChunks - 1})`);
-        offlineContext.resume();
+      const isInitialBuffer = i < initialChunks;
+
+      offlineContext.suspend(suspendTime).then(async () => {
+        if (isInitialBuffer) {
+          // Auto-resume for initial buffer
+          offlineContext.resume();
+        } else {
+          // Beyond initial buffer - notify and wait for permission
+          if (i === initialChunks && onBufferFull) {
+            onBufferFull(suspendTime);
+          }
+
+          // Wait for shouldResume callback to allow continuation
+          if (shouldResume) {
+            // Poll shouldResume until it returns true
+            const checkResume = () => {
+              if (shouldResume(suspendTime)) {
+                offlineContext.resume();
+              } else {
+                // Check again in 100ms
+                setTimeout(checkResume, 100);
+              }
+            };
+            checkResume();
+          } else {
+            // No shouldResume callback - auto-resume (fallback)
+            offlineContext.resume();
+          }
+        }
       });
-      // console.log(`  - Suspend at ${suspendTime.toFixed(2)}s`);
     }
 
     // 5. Start rendering (with captureNode injected)
