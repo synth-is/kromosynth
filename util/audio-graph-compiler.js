@@ -11,19 +11,32 @@
 import * as vagNamespace from 'virtual-audio-graph';
 
 // Handle CJS/ESM interop
-// In ESM (Browser), vagNamespace has named exports (createNode, gain, etc.) and default export (factory).
-// In CJS (Node), vagNamespace.default is the factory, and it might have properties attached.
+// The package exports both named exports (createNode, gain, etc.) and a default export (factory function).
+// In Node.js ESM importing a CJS module, vagNamespace.default is the factory function.
+// In Browser ESM, it depends on the bundler but typically vagNamespace.default is also the factory.
 
-let createVirtualAudioGraph = vagNamespace.default || vagNamespace;
+let createVirtualAudioGraph;
 
-// Additional check: If we got the namespace but it's not callable, it might be a CJS wrapper
-if (typeof createVirtualAudioGraph !== 'function') {
-  // Try to extract the actual function
-  if (typeof vagNamespace === 'function') {
-    createVirtualAudioGraph = vagNamespace;
-  } else {
-    throw new Error('Failed to import createVirtualAudioGraph from virtual-audio-graph. Got: ' + typeof createVirtualAudioGraph);
-  }
+// Priority order:
+// 1. Try vagNamespace.default (most common in both Node and Browser ESM)
+// 2. Try vagNamespace itself if it's a function (direct function export)
+// 3. Try vagNamespace.default.default (double-wrapped CJS)
+if (typeof vagNamespace.default === 'function') {
+  createVirtualAudioGraph = vagNamespace.default;
+} else if (typeof vagNamespace === 'function') {
+  createVirtualAudioGraph = vagNamespace;
+} else if (vagNamespace.default && typeof vagNamespace.default.default === 'function') {
+  createVirtualAudioGraph = vagNamespace.default.default;
+} else {
+  // Debug logging for troubleshooting
+  console.error('virtual-audio-graph import structure:', {
+    typeOfNamespace: typeof vagNamespace,
+    typeOfDefault: typeof vagNamespace.default,
+    hasDefaultDefault: !!(vagNamespace.default && vagNamespace.default.default),
+    keys: Object.keys(vagNamespace),
+    defaultKeys: vagNamespace.default ? Object.keys(vagNamespace.default) : []
+  });
+  throw new Error('Failed to import createVirtualAudioGraph from virtual-audio-graph. Check console for details.');
 }
 
 // Determine where the node factories are located
