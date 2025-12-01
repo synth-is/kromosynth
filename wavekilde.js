@@ -145,6 +145,9 @@ function getOutputsForMemberInCurrentPopulation(
           });
 
         } finally {
+          if (activator && activator.destroy) {
+            activator.destroy();
+          }
           activator = undefined;
         }
 

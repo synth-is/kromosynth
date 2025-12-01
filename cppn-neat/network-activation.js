@@ -24,6 +24,23 @@ class Activator {
     this.sampleRate = sampleRate;
 
     setActivationFunctions( cppnjs );
+    
+    this.gpu = null;
+  }
+
+  getGPU() {
+    if( !this.gpu ) {
+      this.gpu = new GPU();
+      addInputFunctionsToGPU( this.gpu );
+    }
+    return this.gpu;
+  }
+
+  destroy() {
+    if (this.gpu) {
+      this.gpu.destroy();
+      this.gpu = null;
+    }
   }
 
   getInputSignals(
@@ -580,8 +597,8 @@ class Activator {
           output: [sampleCountToActivate || totalSampleCount]
         };
 
-        const gpu = new GPU();
-        addInputFunctionsToGPU( gpu );
+        const gpu = this.getGPU();
+        // addInputFunctionsToGPU( gpu ); // Already added in getGPU
 
         // const oneOutputKernel = this.getGPU().createKernel(
         //   new Function(activationStringForOneOutput), settings );
