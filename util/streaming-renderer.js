@@ -344,6 +344,28 @@ export class StreamingRenderer {
       const isInitialBuffer = i < initialChunks;
 
       offlineContext.suspend(suspendTime).then(async () => {
+        // Check for parameter updates before resuming
+        if (options.getUpdatedParams) {
+          const updatedParams = options.getUpdatedParams();
+          if (updatedParams && (
+            updatedParams.noteDelta !== noteDelta ||
+            updatedParams.velocity !== velocity ||
+            updatedParams.duration !== duration
+          )) {
+            console.log(`🔄 Parameter update at ${suspendTime.toFixed(2)}s:`, updatedParams);
+            // Update local parameters for next iterations
+            if (updatedParams.noteDelta !== undefined) noteDelta = updatedParams.noteDelta;
+            if (updatedParams.velocity !== undefined) velocity = updatedParams.velocity;
+            if (updatedParams.duration !== undefined) duration = updatedParams.duration;
+            
+            // Note: The audio graph is already wired up and running. 
+            // We can't rewire it mid-render without major surgery.
+            // This is a limitation of the current architecture.
+            // TODO: To support true parameter updates, we'd need to modify the audio graph nodes
+            // or use AudioParams with automation, which would require deeper changes.
+          }
+        }
+
         if (isInitialBuffer) {
           // Auto-resume for initial buffer
           offlineContext.resume();
