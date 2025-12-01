@@ -14,7 +14,9 @@ class CaptureProcessor extends AudioWorkletProcessor {
     super();
     this.buffer = [];
     this.totalCaptured = 0;
-    this.chunkSize = 128; // Process quantum size
+    // Increase chunk size to reduce message overhead and match server batching
+    // 4096 samples is ~85ms at 48kHz, similar to ServerStreamingClient's 4800 samples
+    this.chunkSize = 4096; 
 
     // Listen for flush commands
     this.port.onmessage = (event) => {

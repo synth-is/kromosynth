@@ -8,11 +8,26 @@
  * being compatible with the latest virtual-audio-graph that supports AudioWorklets.
  */
 
-import vagImport from 'virtual-audio-graph';
+import * as vagNamespace from 'virtual-audio-graph';
 
-// Handle CJS/ESM interop - default export might be wrapped
-const createVirtualAudioGraph = vagImport.default || vagImport;
-const vagNodes = vagImport;
+// Handle CJS/ESM interop
+// In ESM (Browser), vagNamespace has named exports (createNode, gain, etc.) and default export (factory).
+// In CJS (Node), vagNamespace.default is the factory, and it might have properties attached.
+
+const createVirtualAudioGraph = vagNamespace.default || vagNamespace;
+
+// Determine where the node factories are located
+let vagNodes;
+if (typeof vagNamespace.createNode === 'function') {
+  // ESM: Named exports available on namespace
+  vagNodes = vagNamespace;
+} else if (createVirtualAudioGraph && typeof createVirtualAudioGraph.createNode === 'function') {
+  // CJS: Properties attached to the default export function
+  vagNodes = createVirtualAudioGraph;
+} else {
+  // Fallback
+  vagNodes = vagNamespace;
+}
 
 /**
  * Compile an array-based audio graph to function-based format
