@@ -14,7 +14,17 @@ import * as vagNamespace from 'virtual-audio-graph';
 // In ESM (Browser), vagNamespace has named exports (createNode, gain, etc.) and default export (factory).
 // In CJS (Node), vagNamespace.default is the factory, and it might have properties attached.
 
-const createVirtualAudioGraph = vagNamespace.default || vagNamespace;
+let createVirtualAudioGraph = vagNamespace.default || vagNamespace;
+
+// Additional check: If we got the namespace but it's not callable, it might be a CJS wrapper
+if (typeof createVirtualAudioGraph !== 'function') {
+  // Try to extract the actual function
+  if (typeof vagNamespace === 'function') {
+    createVirtualAudioGraph = vagNamespace;
+  } else {
+    throw new Error('Failed to import createVirtualAudioGraph from virtual-audio-graph. Got: ' + typeof createVirtualAudioGraph);
+  }
+}
 
 // Determine where the node factories are located
 let vagNodes;
