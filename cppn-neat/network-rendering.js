@@ -192,6 +192,7 @@ class Renderer {
 
         // Offline rendering of the audio graph to a reusable buffer
         // TODO: assuming virtualAudioGraph.audioContext is offline - verify?
+        if (captureNode) console.log('  ⏱️ Calling startRendering()...');
         virtualAudioGraph.audioContext.startRendering().then(function( renderedBuffer ) {
           const endRenderAudioGraph = performance.now();
           if( ENVIRONMENT_IS_NODE && process.env.LOG_LEVEL === "debug") console.log(`%c Rendering audio graph took ${endRenderAudioGraph - startRenderAudioGraph} milliseconds`, 'color:darkorange');
@@ -928,7 +929,8 @@ class Renderer {
       feedbackRatio = 0.2
     } = {}) => ({
       'feedbackGainNode': ['gain', 'passthroughGain', {gain: feedbackRatio}], // {gain: 0.90}
-      'delayNode': ['delay', 'feedbackGainNode', {delayTime}], // {delayTime:0.1}
+      // Increase maxDelayTime to support larger delays from genome (up to 5s)
+      'delayNode': ['delay', 'feedbackGainNode', {delayTime, maxDelayTime: 5.0}], // {delayTime:0.1}
       'passthroughGain': ['gain', ['output', 'delayNode'], {gain: 1.0}, 'input']
     });
     return feedbackDelay;

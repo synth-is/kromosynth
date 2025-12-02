@@ -120,7 +120,13 @@ export async function renderAudioAndSpectrogramFromPatchAndMember(
   sampleCountToActivate,
   sampleOffset,
   captureNode = null,  // Optional: AudioWorklet node for incremental capture
+  signal = null // Optional: AbortSignal to cancel rendering
 ) {
+  if (signal?.aborted) {
+    // console.log('🛑 renderAudioAndSpectrogram aborted at start');
+    return null;
+  }
+
   const memberOutputs = await startMemberOutputsRendering(
     waveNetwork, synthIsPatch,
     duration,
@@ -135,6 +141,14 @@ export async function renderAudioAndSpectrogramFromPatchAndMember(
     sampleCountToActivate,
     sampleOffset,
   )
+
+  // Yield to main thread to allow UI updates and signal processing
+  await new Promise(resolve => setTimeout(resolve, 0));
+
+  if (signal?.aborted) {
+    // console.log('🛑 renderAudioAndSpectrogram aborted after member outputs');
+    return null;
+  }
 
   // Adjust duration if sampleCountToActivate is set
   let adjustedDuration = duration;
