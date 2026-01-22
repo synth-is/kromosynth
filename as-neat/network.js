@@ -730,13 +730,47 @@ Network.prototype.addAudioBufferSource = function() {
   this.nodes.push(audioBufferSource);
   this.connections.push(connection);
 
-  this.lastMutation = {
-    objectsChanged: [
-      audioBufferSource,
-      connection
-    ],
-    changeDescription: "Added Audio Buffer Source (AudioBufferSourceNode, WavetableNode or AdditiveNode)"
-  };
+  // If we added an AdditiveNode, we need to add the first partial + envelope connection
+  // so it can receive CPPN outputs (similar to how WavetableNode gets mix connections)
+  if( "AdditiveNode" === audioBufferSource.name ) {
+    // Directly add the partial connections here since addPartialAndEnvelope looks for
+    // existing AdditiveNodes and we just added this one
+    const partialNumber = 1; // First partial
+    const partialNode = PartialNetworkOutputNode.random( partialNumber );
+    const partialGainEnvelopeNode = PartialEnvelopeNetworkOutputNode.random( partialNumber );
+    const onePartialConnection = new Connection({
+      sourceNode: partialNode,
+      targetNode: audioBufferSource,
+      targetParameter: 'partialBuffer'
+    });
+    const onePartialEnvelopeConnection = new Connection({
+      sourceNode: partialGainEnvelopeNode,
+      targetNode: audioBufferSource,
+      targetParameter: 'partialGainEnvelope'
+    });
+    this.nodes.push( partialNode );
+    this.nodes.push( partialGainEnvelopeNode );
+    this.connections.push( onePartialConnection );
+    this.connections.push( onePartialEnvelopeConnection );
+
+    this.lastMutation = {
+      objectsChanged: [
+        audioBufferSource,
+        connection,
+        partialNode, partialGainEnvelopeNode,
+        onePartialConnection, onePartialEnvelopeConnection
+      ],
+      changeDescription: "Added AdditiveNode with initial partial + envelope connections"
+    };
+  } else {
+    this.lastMutation = {
+      objectsChanged: [
+        audioBufferSource,
+        connection
+      ],
+      changeDescription: "Added Audio Buffer Source (AudioBufferSourceNode or WavetableNode)"
+    };
+  }
   this.addToEvolutionHistory(EvolutionTypes.ADD_AUDIO_BUFFER_SOURCE);
   return this;
 };

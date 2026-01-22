@@ -117,8 +117,32 @@ export function compileAudioGraph(arrayBasedGraph, customNodes = {}) {
       continue;
     }
 
+    // Sanitize params: remove read-only properties that cause errors in node-web-audio-api
+    // These properties (numberOfInputs, numberOfOutputs, channelCount in some contexts)
+    // should be set via constructor options, not as properties after creation
+    let sanitizedParams = params;
+    if (params && typeof params === 'object') {
+      // Properties that are read-only in Web Audio API and should not be set directly
+      const readOnlyProps = ['numberOfInputs', 'numberOfOutputs'];
+      const hasReadOnlyProps = readOnlyProps.some(prop => prop in params);
+
+      if (hasReadOnlyProps) {
+        // Create a shallow copy without the read-only properties
+        sanitizedParams = {...params};
+        for (const prop of readOnlyProps) {
+          if (prop in sanitizedParams) {
+            // Log warning for debugging
+            if (process.env.DEBUG_AUDIO_GRAPH) {
+              console.warn(`Removing read-only property "${prop}" from ${nodeType} node (key: ${key})`);
+            }
+            delete sanitizedParams[prop];
+          }
+        }
+      }
+    }
+
     // Compile: [nodeType, output, params] → nodeFactory(output, params)
-    compiledGraph[key] = nodeFactory(output, params);
+    compiledGraph[key] = nodeFactory(output, sanitizedParams);
   }
 
   return compiledGraph;

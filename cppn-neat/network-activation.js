@@ -243,9 +243,20 @@ class Activator {
               break;
             }
           }
-          const oneFrequencyCPPNMember = member.CPPNs[
-            getRoundedFrequencyValue( frequencyForLookup )
-          ];
+          const lookupFreq = getRoundedFrequencyValue( frequencyForLookup );
+          let oneFrequencyCPPNMember = member.CPPNs[lookupFreq];
+
+          if (!oneFrequencyCPPNMember) {
+            console.warn(`[NetworkActivation] Missing CPPN for freq ${frequencyForLookup} (rounded: ${lookupFreq}). Keys:`, Object.keys(member.CPPNs).slice(0, 5));
+            // Fallback: try to find a nearby key
+            const keys = Object.keys(member.CPPNs).map(Number);
+            if (keys.length > 0) {
+              const closest = keys.reduce((prev, curr) => Math.abs(curr - lookupFreq) < Math.abs(prev - lookupFreq) ? curr : prev);
+              console.warn(`[NetworkActivation] Using fallback CPPN at ${closest}`);
+              oneFrequencyCPPNMember = member.CPPNs[closest];
+            }
+          }
+
           memberCPPN = this.getCPPNFromMember( oneFrequencyCPPNMember );
 
           // we have CPPNs with only one output in this case

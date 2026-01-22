@@ -62,7 +62,7 @@ function getOutputsForMemberInCurrentPopulation(
 
     if( ! currentPatch ) {
 
-      resolve( new Map() );
+      resolve( { memberOutputs: new Map(), patch: null } );
 
     } else {
 
@@ -118,7 +118,9 @@ function getOutputsForMemberInCurrentPopulation(
             antiAliasing
           ).then( memberOutputs => {
             try {
-              resolve( memberOutputs );
+              // Return both memberOutputs and the modified patch so callers can use the same patch
+              // for subsequent operations (avoiding key mismatches from double-modification)
+              resolve( { memberOutputs, patch: currentPatch } );
             } finally {
               memberOutputs = undefined;
             }
@@ -138,7 +140,7 @@ function getOutputsForMemberInCurrentPopulation(
               totalSampleCount: _totalSampleCount,
               velocity
             }).then(
-              memberOutputs => resolve( memberOutputs ),
+              memberOutputs => resolve( { memberOutputs, patch: currentPatch } ),
               rejection => reject( rejection )
             );
             // reject("failed to activateMember on GPU");
@@ -173,7 +175,7 @@ function getOutputsForMemberInCurrentPopulation(
           totalSampleCount: _totalSampleCount,
           velocity
         }).then(
-          memberOutputs => resolve( memberOutputs ),
+          memberOutputs => resolve( { memberOutputs, patch: currentPatch } ),
           rejection => reject( rejection )
         );
       }
@@ -461,12 +463,14 @@ function getAudioBuffersForMember(
   audioContext,
   useOvertoneInharmonicityFactors,
   frequencyUpdatesApplyToAllPathcNetworkOutputs = false,
-  captureNode = null  // Optional: AudioWorklet node for incremental capture
+  captureNode = null,  // Optional: AudioWorklet node for incremental capture
+  patchAlreadyModified = false  // If true, skip getPatchWithBufferFrequenciesUpdatedAccordingToNoteDelta (patch was already modified by getOutputsForMemberInCurrentPopulation)
 ) {
   return new Promise( (resolve, reject) => {
 
     let patch = patchParam;
-    if( true // as in getOutputsForMemberInCurrentPopulation: now we'll always want to do this, as there might be 'partialBuffer' (overtone) connections, not just when:
+    if( !patchAlreadyModified // skip if patch was already modified by getOutputsForMemberInCurrentPopulation
+      // as in getOutputsForMemberInCurrentPopulation: now we'll always want to do this, as there might be 'partialBuffer' (overtone) connections, not just when:
       // noteDelta && noteDelta != 0
     ) {
       patch = getPatchWithBufferFrequenciesUpdatedAccordingToNoteDelta(

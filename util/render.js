@@ -127,7 +127,8 @@ export async function renderAudioAndSpectrogramFromPatchAndMember(
     return null;
   }
 
-  const memberOutputs = await startMemberOutputsRendering(
+  // startMemberOutputsRendering returns { memberOutputs, patch } where patch is the modified version
+  const result = await startMemberOutputsRendering(
     waveNetwork, synthIsPatch,
     duration,
     noteDelta,
@@ -140,7 +141,8 @@ export async function renderAudioAndSpectrogramFromPatchAndMember(
     frequencyUpdatesApplyToAllPathcNetworkOutputs,
     sampleCountToActivate,
     sampleOffset,
-  )
+  );
+  const { memberOutputs, patch: modifiedPatch } = result;
 
   // Yield to main thread to allow UI updates and signal processing
   await new Promise(resolve => setTimeout(resolve, 0));
@@ -157,13 +159,16 @@ export async function renderAudioAndSpectrogramFromPatchAndMember(
     adjustedDuration = (sampleCountToActivate / totalSamples) * duration;
   }
 
+  // Use the modified patch from startMemberOutputsRendering to ensure memberOutputs keys match
+  // Pass patchAlreadyModified=true to skip redundant getPatchWithBufferFrequenciesUpdatedAccordingToNoteDelta call
   const audioBufferAndCanvas = await startAudioBuffersRendering(
-    memberOutputs, synthIsPatch, adjustedDuration, noteDelta, sampleRate, asDataArray,
+    memberOutputs, modifiedPatch || synthIsPatch, adjustedDuration, noteDelta, sampleRate, asDataArray,
     offlineAudioContext,
     audioContext,
     useOvertoneInharmonicityFactors,
     frequencyUpdatesApplyToAllPathcNetworkOutputs,
-    captureNode
+    captureNode,
+    true  // patchAlreadyModified - the patch was already modified by getOutputsForMemberInCurrentPopulation
   );
 
   return audioBufferAndCanvas;
@@ -197,9 +202,11 @@ export function wireUpAudioGraphForPatchAndWaveNetwork(
       reverse,
       antiAliasing,
       frequencyUpdatesApplyToAllPathcNetworkOutputs
-    ).then( memberOutputs => {
+    ).then( result => {
+      // startMemberOutputsRendering returns { memberOutputs, patch } where patch is the modified version
+      const { memberOutputs, patch: modifiedPatch } = result;
       wireUpAudioGraph(
-        memberOutputs, synthIsPatch, duration, noteDelta, audioContextInstance
+        memberOutputs, modifiedPatch || synthIsPatch, duration, noteDelta, audioContextInstance
       ).then( virtualAudioGraph => resolve(virtualAudioGraph) )
       .catch( e => reject(e) );
     }).catch( e => reject(e) );
@@ -246,7 +253,8 @@ export function startAudioBuffersRendering(
   audioContext,
   useOvertoneInharmonicityFactors,
   frequencyUpdatesApplyToAllPathcNetworkOutputs = false,
-  captureNode = null  // Optional: AudioWorklet node for incremental capture
+  captureNode = null,  // Optional: AudioWorklet node for incremental capture
+  patchAlreadyModified = false  // If true, skip redundant patch modification (patch came from getOutputsForMemberInCurrentPopulation)
 ) {
   return getAudioBuffersForMember(
     memberOutputs /*existingMemberOutputs*/,
@@ -264,7 +272,8 @@ export function startAudioBuffersRendering(
     audioContext,
     useOvertoneInharmonicityFactors,
     frequencyUpdatesApplyToAllPathcNetworkOutputs,
-    captureNode
+    captureNode,
+    patchAlreadyModified
   );
 }
 

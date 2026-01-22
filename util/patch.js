@@ -19,7 +19,8 @@ export async function doesPatchNetworkHaveMinimumFitness(
   const synthIsPatch = patchFromAsNEATnetwork(asNEATNetworkJSONString);
 
   const duration = patchFitnessTestDuration || 0.1;
-  let memberOutputs = await getOutputsForMemberInCurrentPopulation(
+  // getOutputsForMemberInCurrentPopulation now returns { memberOutputs, patch }
+  let result = await getOutputsForMemberInCurrentPopulation(
     0, // populationIndex - TODO: isn't really used?
     0, // memberIndex - TODO: isn't really used?
     duration, // duration
@@ -37,7 +38,8 @@ export async function doesPatchNetworkHaveMinimumFitness(
   } );
   let audioBufferAndCanvas;
   try {
-    if( memberOutputs ) {
+    if( result && result.memberOutputs ) {
+      const { memberOutputs, patch: modifiedPatch } = result;
       audioBufferAndCanvas = await getAudioBuffersForMember(
         memberOutputs,
         0, // populationIndex
@@ -46,18 +48,22 @@ export async function doesPatchNetworkHaveMinimumFitness(
         null, // noteDelta
         null, //reverse
         audioCtx.sampleRate, // sample rate
-        synthIsPatch,
+        modifiedPatch || synthIsPatch,  // use modified patch
         false, // renderSpectrograms
         null, // spectrogramDimensions
         undefined, // getDataArray
         offlineAudioContext,
-        audioCtx
+        audioCtx,
+        null, // useOvertoneInharmonicityFactors
+        false, // frequencyUpdatesApplyToAllPathcNetworkOutputs
+        null, // captureNode
+        true  // patchAlreadyModified - skip redundant modification
       ).catch( e => {
         console.error("getAudioBuffersForMember rejected:", e);
       } );
     }
   } finally {
-    memberOutputs = null;
+    result = null;
   }
   if( audioBufferAndCanvas && audioBufferAndCanvas.audioBuffer ) {
     const audioBuffer = audioBufferAndCanvas.audioBuffer;
