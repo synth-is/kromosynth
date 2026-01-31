@@ -184,8 +184,16 @@ Network.prototype.crossWith = function(otherNetwork, defaultParameters) {
   }
   function addConnection(connection, i) {
     var source = _.find(nodes, {id: connection.sourceNode.id}),
-        target = _.find(nodes, {id: connection.targetNode.id}),
-        newConn = connection.clone(source, target);
+        target = _.find(nodes, {id: connection.targetNode.id});
+    
+    // Skip connections where source or target node doesn't exist in the merged network
+    // This can happen during crossover when one parent has nodes the other doesn't
+    if (!source || !target) {
+      // console.log(`Skipping connection ${connection.id}: source=${!!source}, target=${!!target}`);
+      return;
+    }
+    
+    var newConn = connection.clone(source, target);
     if (typeof i === 'undefined') {
       connections.push(newConn);
       tIndexes[connection.id]=connections.length-1;

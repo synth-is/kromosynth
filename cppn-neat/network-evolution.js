@@ -176,6 +176,7 @@ class Evolver {
         cppnInputCount : iecOpt.cppnInputCount,
         cppnOutputCount : iecOpt.cppnOutputCount
       };
+      console.log('📐 IEC Generator - using provided iecOptions:', iecOptions);
     } else {
       // IEC options taken from
       // https://github.com/OptimusLime/win-Picbreeder/blob/33366ef1d8bfd13c936313d2fdb2afed66c31309/html/pbHome.html#L95
@@ -184,6 +185,7 @@ class Evolver {
         initialMutationCount : 5,
         postMutationCount : 5  // AKA mutationsOnCreation
       };
+      console.log('📐 IEC Generator - using DEFAULT iecOptions (no evoParams.iecOptions found):', iecOptions);
     }
 
     const initialPopulationSeeds = this._getInitialPopulationSeeds( 

@@ -78,6 +78,11 @@ export async function getNewAudioSynthesisGenomeByMutation(
     ) {
       // mutate the wave network outputs
       const evoParamsWaveNetwork = getWaveNetworkParamsFromEvoParams( evoParams );
+      console.log('🔧 CPPN mutation - evoParamsWaveNetwork:', {
+        hasIecOptions: !!evoParamsWaveNetwork?.iecOptions,
+        iecOptions: evoParamsWaveNetwork?.iecOptions,
+        hasNeatParameters: !!evoParamsWaveNetwork?.neatParameters
+      });
       let evolver = getEvolver(evoParamsWaveNetwork);
       if( genomes[0].waveNetwork.oneCPPNPerFrequency ) {
         // we have one CPPN per frequency
@@ -116,10 +121,12 @@ export async function getNewAudioSynthesisGenomeByMutation(
     if( Math.random() < probabilityMutatingPatch ) {
         let patchClone = genomes[0].asNEATPatch.clone();
         if( genomes.length > 1 ) {
+          // Crossover with other parents first
           for( let i=1; i<genomes.length; i++ ) {
             patchClone = patchClone.crossWith( genomes[i].asNEATPatch, evoParams.audioGraph.defaultParameters );
           }
-          asNEATPatch = patchClone;
+          // Then apply mutation after crossover (important for IEC to keep evolving)
+          asNEATPatch = patchClone.mutate( asNEATMutationParams );
         } else {
           asNEATPatch = patchClone.mutate( asNEATMutationParams );
         }
@@ -157,6 +164,9 @@ export async function getNewAudioSynthesisGenomeByMutation(
     offlineAudioContext = undefined;
     if( ! patchOK ) {
       defectivePatches.push( asNEATPatch );
+      console.log(`❌ Patch validation failed, attempt ${patchMutationAttempt}, will retry...`);
+    } else {
+      console.log(`✅ Patch validation passed on attempt ${patchMutationAttempt}`);
     }
     patchMutationAttempt++;
 

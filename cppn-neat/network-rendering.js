@@ -89,6 +89,24 @@ class Renderer {
         }
         catch (e) {
           console.error("Error creating virtual audio graph", e);
+          // Log the graph structure to help debug
+          console.error("🔍 Graph keys:", Object.keys(graphDefinition));
+          console.error("🔍 Graph structure:", JSON.stringify(graphDefinition, (key, value) => {
+            // Skip large arrays (buffers) for readability
+            if (Array.isArray(value) && value.length > 100) {
+              return `[Array(${value.length})]`;
+            }
+            if (value instanceof Float32Array) {
+              return `[Float32Array(${value.length})]`;
+            }
+            if (value instanceof AudioBuffer) {
+              return `[AudioBuffer]`;
+            }
+            if (typeof value === 'function') {
+              return '[Function]';
+            }
+            return value;
+          }, 2));
           reject("Error creating virtual audio graph:", e);
         }
 
@@ -581,7 +599,121 @@ class Renderer {
       //     threshold: -50
       // }];
     }
+    
+    // Clean up dangling connections - connections that reference deleted nodes
+    // This is needed when wavetable/additive nodes fail to create (no value curves)
+    this.cleanupDanglingConnections(graph);
+    
     return graph;
+  }
+  
+  /**
+   * Remove connections that reference nodes that don't exist in the graph.
+   * Also removes orphaned weight nodes (weight nodes whose targets don't exist).
+   * Also removes weight nodes connecting to non-connectable params (partialBuffer, partialGainEnvelope).
+   * This prevents errors when nodes are deleted (e.g., wavetable/additive that failed to create).
+   */
+  cleanupDanglingConnections(graph) {
+    const validNodeKeys = new Set(Object.keys(graph));
+    // Also add special targets
+    validNodeKeys.add('output');
+    validNodeKeys.add('clickRemoval');
+    
+    // Parameters that are NOT AudioParams and cannot be connected to via Web Audio API
+    // These are internal data parameters on custom nodes (additive/wavetable synthesis)
+    const nonConnectableParams = new Set(['partialBuffer', 'partialGainEnvelope']);
+    
+    let cleanupCount = 0;
+    let iterations = 0;
+    const maxIterations = 10; // Prevent infinite loops
+    
+    // Iteratively clean up until no more changes (handles cascading dependencies)
+    let hasChanges = true;
+    while (hasChanges && iterations < maxIterations) {
+      hasChanges = false;
+      iterations++;
+      
+      // First pass: clean up invalid connections in all nodes
+      for (const nodeKey in graph) {
+        const nodeDef = graph[nodeKey];
+        if (!Array.isArray(nodeDef) || nodeDef.length < 2) continue;
+        
+        const connections = nodeDef[1];
+        if (!Array.isArray(connections)) continue;
+        
+        const originalLength = connections.length;
+        
+        // Filter out connections to non-existent nodes or non-connectable params
+        const validConnections = connections.filter(conn => {
+          if (typeof conn === 'string') {
+            // Check if the target exists in the graph
+            return validNodeKeys.has(conn);
+          } else if (typeof conn === 'object' && conn.key) {
+            // Object connection: {key: "nodeKey", destination: "param"}
+            // Check if target exists AND the destination is connectable
+            if (!validNodeKeys.has(conn.key)) return false;
+            if (conn.destination && nonConnectableParams.has(conn.destination)) {
+              // This is a non-connectable param - remove this connection
+              return false;
+            }
+            return true;
+          }
+          // Other connection types (numbers, etc.) - keep them
+          return true;
+        });
+        
+        if (validConnections.length < originalLength) {
+          cleanupCount += originalLength - validConnections.length;
+          nodeDef[1] = validConnections;
+          hasChanges = true;
+        }
+      }
+      
+      // Second pass: remove orphaned weight nodes
+      // Weight nodes are named like "sourceId_targetId-weight" or "sourceId_targetId-param-weight"
+      const nodesToDelete = [];
+      for (const nodeKey in graph) {
+        if (nodeKey.endsWith('-weight')) {
+          const nodeDef = graph[nodeKey];
+          
+          // Delete if no output connections
+          if (Array.isArray(nodeDef) && Array.isArray(nodeDef[1]) && nodeDef[1].length === 0) {
+            nodesToDelete.push(nodeKey);
+            continue;
+          }
+          
+          // Check if source node exists (first part before underscore)
+          const underscoreIndex = nodeKey.indexOf('_');
+          if (underscoreIndex > 0) {
+            const sourceNodeId = nodeKey.substring(0, underscoreIndex);
+            // If the source node doesn't exist (and isn't a special node), this weight node is orphaned
+            if (!validNodeKeys.has(sourceNodeId)) {
+              nodesToDelete.push(nodeKey);
+              continue;
+            }
+          }
+          
+          // Also check if this weight node connects to a non-connectable param
+          // Weight nodes with non-connectable params are named like "sourceId_targetId-partialBuffer-weight"
+          if (nodeKey.includes('-partialBuffer-') || nodeKey.includes('-partialGainEnvelope-')) {
+            nodesToDelete.push(nodeKey);
+            continue;
+          }
+        }
+      }
+      
+      // Delete orphaned weight nodes and remove them from validNodeKeys
+      for (const nodeKey of nodesToDelete) {
+        delete graph[nodeKey];
+        validNodeKeys.delete(nodeKey);
+        cleanupCount++;
+        hasChanges = true;
+      }
+    }
+    
+    if (cleanupCount > 0) {
+      console.log(`  🧹 Cleaned up ${cleanupCount} dangling connections/nodes in ${iterations} iteration(s)`);
+    }
   }
 
   getValueCurvesFromPatch( patch, memberOutputs, sampleCount, audioContext,
