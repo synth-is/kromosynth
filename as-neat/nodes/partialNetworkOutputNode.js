@@ -41,9 +41,9 @@ PartialNetworkOutputNode.prototype.defaultParameters = {
 
   mutatableParameters: [
     {
-      name: 'type', // synth.is network output number
+      name: 'type', // synth.is network output number (0-17 for 18 CPPN outputs)
       mutationDeltaChance: 0,
-      randomMutationRange: {min: 0, max: 18},
+      randomMutationRange: {min: 0, max: 17},
       allowRandomInverse: false,
       discreteMutation: true
     },{
