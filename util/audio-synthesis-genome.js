@@ -5,6 +5,7 @@ import { patchFromAsNEATnetwork } from './audio-graph-asNEAT-bridge.js';
 import { getRoundedFrequencyValue } from './range.js';
 import { getPatchWithBufferFrequenciesUpdatedAccordingToNoteDelta } from '../wavekilde.js';
 import neatjs from 'neatjs';
+import { INPUTS as CPPN_INPUTS, OUTPUTS as CPPN_OUTPUTS } from '../cppn-neat/evolution-constants.js';
 
 // let evolver;
 function getEvolver(evoParamsWaveNetwork) {
@@ -42,6 +43,9 @@ export function getNewAudioSynthesisGenome(
     // only one CPPN, serving all frequencies
     waveNetwork = initializeWaveNetwork( evoParams );
   }
+  
+  // Ensure CPPN has connections to all outputs required by the initial patch
+  synchronizeCPPNWithPatch(waveNetwork, asNEATPatch);
   
   return {
     waveNetwork, asNEATPatch, virtualAudioGraph,
@@ -130,6 +134,11 @@ export async function getNewAudioSynthesisGenomeByMutation(
         } else {
           asNEATPatch = patchClone.mutate( asNEATMutationParams );
         }
+        
+        // Ensure CPPN has connections to all outputs required by the patch
+        // This prevents orphaned wavetable/additive nodes when mutation adds new network outputs
+        synchronizeCPPNWithPatch(waveNetwork, asNEATPatch);
+        
         if( genomes[0].waveNetwork.oneCPPNPerFrequency ) {
           // // let's check if there are new frequencies which don't yet have an associated / specialised CPPN
           let virtualAudioGraph = patchFromAsNEATnetwork( asNEATPatch.toJSON() ); // aka synthIsPatch
@@ -321,4 +330,147 @@ function getASNEATDefaultParamsFromEvoParams( evoParams ) {
     defaultParameters = {};
   }
   return defaultParameters;
+}
+
+/**
+ * Get all CPPN output indices required by the patch.
+ * These are the "type" values from NetworkOutputNode, NoteNetworkOutputNode, etc.
+ * @param {Object} asNEATPatch - The asNEAT patch network
+ * @returns {Set<number>} Set of required CPPN output indices
+ */
+function getRequiredCPPNOutputIndices(asNEATPatch) {
+  const requiredOutputs = new Set();
+  const networkOutputNodeTypes = [
+    'NetworkOutputNode', 'NoteNetworkOutputNode',
+    'PartialNetworkOutputNode', 'PartialEnvelopeNetworkOutputNode'
+  ];
+  
+  asNEATPatch.nodes.forEach(node => {
+    if (networkOutputNodeTypes.includes(node.name)) {
+      // The 'type' property is the CPPN output index (0-17 for numeric, or noise types)
+      const outputType = node.type;
+      // Only consider numeric output indices (noise types are strings like "noiseWhite")
+      if (typeof outputType === 'number' || !isNaN(parseInt(outputType))) {
+        const outputIndex = typeof outputType === 'number' ? outputType : parseInt(outputType);
+        if (!isNaN(outputIndex)) {
+          requiredOutputs.add(outputIndex);
+        }
+      }
+    }
+  });
+  
+  return requiredOutputs;
+}
+
+/**
+ * Ensure the CPPN has at least one connection leading to each required output.
+ * If an output has no incoming connections, add one from a random input node.
+ * @param {Object} cppnOffspring - The CPPN genome (neatjs genome)
+ * @param {Set<number>} requiredOutputIndices - Set of required CPPN output indices
+ * @returns {boolean} True if any connections were added
+ */
+function ensureCPPNConnectivityToOutputs(cppnOffspring, requiredOutputIndices) {
+  if (!cppnOffspring || !requiredOutputIndices || requiredOutputIndices.size === 0) {
+    return false;
+  }
+  
+  // CPPN structure: bias(0), inputs(1..inputCount), outputs(inputCount+1..inputCount+outputCount)
+  const inputCount = cppnOffspring.inputNodeCount || CPPN_INPUTS;
+  const biasAndInputCount = inputCount + 1; // +1 for bias node
+  
+  // Get the node IDs - in neatjs, nodes are ordered: bias, inputs, outputs, hidden
+  // The gid (global id) is typically the innovation ID assigned during creation
+  const inputNodeIds = [];
+  const outputNodeIds = [];
+  const outputNodeIdToIndex = new Map();
+  
+  cppnOffspring.nodes.forEach((node, idx) => {
+    if (idx === 0) {
+      // Bias node
+      inputNodeIds.push(node.gid);
+    } else if (idx <= inputCount) {
+      // Input nodes
+      inputNodeIds.push(node.gid);
+    } else if (idx < biasAndInputCount + (cppnOffspring.outputNodeCount || CPPN_OUTPUTS)) {
+      // Output nodes
+      const outputIndex = idx - biasAndInputCount;
+      outputNodeIds.push(node.gid);
+      outputNodeIdToIndex.set(node.gid, outputIndex);
+    }
+  });
+  
+  // Find which outputs already have incoming connections
+  const outputsWithConnections = new Set();
+  cppnOffspring.connections.forEach(conn => {
+    if (outputNodeIdToIndex.has(conn.targetID)) {
+      outputsWithConnections.add(outputNodeIdToIndex.get(conn.targetID));
+    }
+  });
+  
+  // Add connections for required outputs that don't have any
+  let connectionsAdded = false;
+  requiredOutputIndices.forEach(requiredOutputIndex => {
+    if (requiredOutputIndex >= outputNodeIds.length) {
+      console.warn(`⚠️ Required CPPN output index ${requiredOutputIndex} exceeds CPPN output count ${outputNodeIds.length}`);
+      return;
+    }
+    
+    if (!outputsWithConnections.has(requiredOutputIndex)) {
+      // This output has no incoming connections - add one from a random input
+      const targetNodeId = outputNodeIds[requiredOutputIndex];
+      const sourceNodeId = inputNodeIds[Math.floor(Math.random() * inputNodeIds.length)];
+      
+      // Create a unique innovation ID for this connection
+      const connectionId = `ensured_${sourceNodeId}_${targetNodeId}_${Date.now()}`;
+      const randomWeight = (Math.random() * 6) - 3; // Range -3 to 3
+      
+      const newConnection = new neatjs.neatConnection(
+        connectionId,
+        randomWeight,
+        { sourceID: sourceNodeId, targetID: targetNodeId }
+      );
+      
+      cppnOffspring.connections.push(newConnection);
+      connectionsAdded = true;
+      console.log(`🔗 Added CPPN connection to output ${requiredOutputIndex}: ${sourceNodeId} → ${targetNodeId} (weight: ${randomWeight.toFixed(3)})`);
+    }
+  });
+  
+  return connectionsAdded;
+}
+
+/**
+ * Synchronize CPPN connectivity with patch requirements.
+ * Call this after patch mutation to ensure the CPPN can serve all patch outputs.
+ * @param {Object} waveNetwork - The wave network containing CPPN(s)
+ * @param {Object} asNEATPatch - The mutated asNEAT patch
+ */
+function synchronizeCPPNWithPatch(waveNetwork, asNEATPatch) {
+  const requiredOutputs = getRequiredCPPNOutputIndices(asNEATPatch);
+  
+  if (requiredOutputs.size === 0) {
+    console.log('🔗 No network outputs in patch, skipping CPPN synchronization');
+    return; // No network outputs in patch
+  }
+  
+  console.log(`🔗 Synchronizing CPPN connectivity for ${requiredOutputs.size} required outputs: [${[...requiredOutputs].join(', ')}]`);
+  
+  if (waveNetwork.oneCPPNPerFrequency) {
+    // For one-CPPN-per-frequency, ensure each CPPN has connectivity
+    const freqKeys = Object.keys(waveNetwork.CPPNs);
+    console.log(`🔗 Processing ${freqKeys.length} frequency-specific CPPNs`);
+    freqKeys.forEach(freq => {
+      const cppn = waveNetwork.CPPNs[freq];
+      if (cppn && cppn.offspring) {
+        ensureCPPNConnectivityToOutputs(cppn.offspring, requiredOutputs);
+      }
+    });
+  } else {
+    // Single CPPN mode
+    if (waveNetwork.offspring) {
+      ensureCPPNConnectivityToOutputs(waveNetwork.offspring, requiredOutputs);
+    } else {
+      console.warn('🔗 waveNetwork.offspring is undefined, cannot synchronize CPPN');
+    }
+  }
 }

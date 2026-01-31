@@ -770,6 +770,31 @@ Network.prototype.addAudioBufferSource = function() {
       ],
       changeDescription: "Added AdditiveNode with initial partial + envelope connections"
     };
+  } else if( "WavetableNode" === audioBufferSource.name || "AudioBufferSourceNode" === audioBufferSource.name ) {
+    // WavetableNode and AudioBufferSourceNode need a NoteNetworkOutputNode to provide buffer data
+    const bufferSourceNode = NoteNetworkOutputNode.random( this.includeNoise );
+    this.nodes.push( bufferSourceNode );
+    const bufferConnection = new Connection({
+      sourceNode: bufferSourceNode,
+      targetNode: audioBufferSource,
+      targetParameter: 'buffer'
+    });
+    this.connections.push( bufferConnection );
+    
+    // WavetableNode also needs a mix connection for wavetable synthesis
+    if( "WavetableNode" === audioBufferSource.name ) {
+      this.addWavetableMixWaveConnection( audioBufferSource );
+    }
+    
+    this.lastMutation = {
+      objectsChanged: [
+        audioBufferSource,
+        connection,
+        bufferSourceNode,
+        bufferConnection
+      ],
+      changeDescription: "Added Audio Buffer Source with CPPN buffer connection"
+    };
   } else {
     this.lastMutation = {
       objectsChanged: [
