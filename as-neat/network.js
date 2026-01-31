@@ -111,7 +111,10 @@ Network.prototype.defaultParameters = {
   addAudioBufferSourceWavetableChance: 0.3,
   addAudioBufferSourceAdditiveChance: 0.4,
 
-  includeNoise: true,
+  // synth.is: Network output nodes reference CPPN outputs (indices 0-17), not oscillator types.
+  // Noise types (indices 18-20: noiseWhite, noisePink, noiseBrown) are not valid CPPN outputs,
+  // so we default to false to prevent creating nodes with invalid type values.
+  includeNoise: false,
 
   // initial node chances must add up to 1
   initialOscillatorChance: 0,
