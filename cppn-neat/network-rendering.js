@@ -99,7 +99,8 @@ class Renderer {
             if (value instanceof Float32Array) {
               return `[Float32Array(${value.length})]`;
             }
-            if (value instanceof AudioBuffer) {
+            // Check for AudioBuffer safely (may not exist in Node.js)
+            if (typeof AudioBuffer !== 'undefined' && value instanceof AudioBuffer) {
               return `[AudioBuffer]`;
             }
             if (typeof value === 'function') {
