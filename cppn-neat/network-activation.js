@@ -19,9 +19,10 @@ const ENVIRONMENT_IS_NODE = typeof process==="object"&&typeof process.versions==
 
 class Activator {
 
-  constructor( sampleRate ) {
+  constructor( sampleRate, useGPU = false ) {
 
     this.sampleRate = sampleRate;
+    this.useGPU = useGPU;
 
     setActivationFunctions( cppnjs );
     
@@ -29,9 +30,12 @@ class Activator {
   }
 
   getGPU() {
-    if( !this.gpu ) {
+    if( !this.gpu && this.useGPU ) {
+      console.log('🚀 GPU acceleration enabled for CPPN rendering');
       this.gpu = new GPU();
       addInputFunctionsToGPU( this.gpu );
+    } else if (!this.useGPU) {
+      console.warn('⚠️  GPU acceleration is DISABLED - using CPU rendering');
     }
     return this.gpu;
   }
@@ -278,6 +282,7 @@ class Activator {
         // console.log("---frequency:",frequency);
         const inputPeriods = frequency * (_totalSampleCount / this.sampleRate);
         // let outputSignals;
+        console.log(`🔧 Rendering ${_sampleCountToActivate} samples at ${frequency}Hz, useGPU=${useGPU}, this.useGPU=${this.useGPU}`);
         if( useGPU ) {
 
           if( member.oneCPPNPerFrequency ) {

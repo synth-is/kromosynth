@@ -100,7 +100,7 @@ function getOutputsForMemberInCurrentPopulation(
         //   activator = new Activator( sampleRate );
         // }
 
-        let activator = new Activator( sampleRate );
+        let activator = new Activator( sampleRate, useGPU );
 
         try {
 
