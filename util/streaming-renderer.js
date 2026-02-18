@@ -330,50 +330,41 @@ export class StreamingRenderer {
       }
     };
 
-    // 4. Schedule suspends with controlled resume support
-    const initialChunks = this.controlledResume
-      ? Math.ceil(this.initialBufferDuration / chunkDuration)
-      : numChunks;
-
+    // 4. Schedule suspends for controlled resume (live preview) or skip entirely (batch/WAV capture)
     if (this.controlledResume) {
+      const initialChunks = Math.ceil(this.initialBufferDuration / chunkDuration);
       console.log(`📊 Controlled resume: initial buffer = ${this.initialBufferDuration}s (${initialChunks} chunks), buffer ahead = ${this.bufferAhead}s`);
-    }
 
-    for (let i = 1; i < numChunks; i++) {
-      const suspendTime = i * chunkDuration;
-      const isInitialBuffer = i < initialChunks;
+      for (let i = 1; i < numChunks; i++) {
+        const suspendTime = i * chunkDuration;
+        const isInitialBuffer = i < initialChunks;
 
-      offlineContext.suspend(suspendTime).then(async () => {
-        // TODO: Parameter update support would go here
-        // Would require passing options parameter and implementing parameter automation
-        
-        if (isInitialBuffer) {
-          // Auto-resume for initial buffer
-          offlineContext.resume();
-        } else {
-          // Beyond initial buffer - notify and wait for permission
-          if (i === initialChunks && onBufferFull) {
-            onBufferFull(suspendTime);
-          }
-
-          // Wait for shouldResume callback to allow continuation
-          if (shouldResume) {
-            // Poll shouldResume until it returns true
-            const checkResume = () => {
-              if (shouldResume(suspendTime)) {
-                offlineContext.resume();
-              } else {
-                // Check again in 100ms
-                setTimeout(checkResume, 100);
-              }
-            };
-            checkResume();
-          } else {
-            // No shouldResume callback - auto-resume (fallback)
+        offlineContext.suspend(suspendTime).then(async () => {
+          if (isInitialBuffer) {
             offlineContext.resume();
+          } else {
+            if (i === initialChunks && onBufferFull) {
+              onBufferFull(suspendTime);
+            }
+            if (shouldResume) {
+              const checkResume = () => {
+                if (shouldResume(suspendTime)) {
+                  offlineContext.resume();
+                } else {
+                  setTimeout(checkResume, 100);
+                }
+              };
+              checkResume();
+            } else {
+              offlineContext.resume();
+            }
           }
-        }
-      });
+        });
+      }
+    } else {
+      // Batch mode: no suspend/resume — let startRendering() run straight through.
+      // The AudioWorklet capture node still emits chunks as they are processed.
+      console.log(`⚡ Batch mode: no suspend/resume scheduling (full-speed rendering)`);
     }
 
     // 5. Start rendering (with captureNode injected)

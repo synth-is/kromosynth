@@ -268,6 +268,9 @@ function getInitialPatchASNEAT( evoParams ) {
 export async function getGenomeFromGenomeString( genomeString, evoParams ) {
   const genomePartiallyStringified = JSON.parse(genomeString);
   const genome = genomePartiallyStringified.genome ? genomePartiallyStringified.genome : genomePartiallyStringified;
+  if( !genome.asNEATPatch ) {
+    throw new Error('Genome is missing asNEATPatch (audio synthesis patch network) - this genome may be from an incompatible format or was stored incompletely');
+  }
   const defaultParameters = getASNEATDefaultParamsFromEvoParams( evoParams );
   const asNEATPatch = await Network.createFromJSON(
     genome.asNEATPatch,
